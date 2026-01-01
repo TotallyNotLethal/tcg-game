@@ -29,6 +29,8 @@ class GameGUI:
         self.drag_state: DragState = DragState()
         self.card_tags: Dict[tuple[int, str], Card] = {}
         self.selected_card: Optional[Card] = None
+        self.selected_player_idx: Optional[int] = None
+        self.selected_tag: Optional[str] = None
         self.preview_window: Optional[tk.Toplevel] = None
         self.drop_zone_boxes: Dict[int, tuple[int, int, int, int]] = {}
         self.drop_zone_items: Dict[int, tuple[int, int]] = {}
@@ -244,12 +246,27 @@ class GameGUI:
             canvas.tag_bind(tag, "<ButtonRelease-1>", lambda e, t=tag, p=idx: self._end_drag(e, p, t))
             canvas.itemconfig(text_tag, font=("Arial", 9, "bold"))
 
+        if self.selected_player_idx == idx:
+            if self.selected_card is None or self.selected_card not in player.hand:
+                self._clear_selection()
+            else:
+                new_index = player.hand.index(self.selected_card)
+                self.selected_tag = f"hand_{idx}_{new_index}"
+                self._apply_selection_highlight()
+
     def _select_card(self, player_idx: int, tag: str) -> None:
         if player_idx != self.human_index:
             return
-        self.selected_card = self.card_tags.get((player_idx, tag))
-        if self.selected_card:
-            self._log(f"Selected {self.selected_card.name} from {self.game.players[player_idx].name}'s hand.")
+        card = self.card_tags.get((player_idx, tag))
+        if not card:
+            self._clear_selection()
+            return
+        self._clear_selection()
+        self.selected_card = card
+        self.selected_player_idx = player_idx
+        self.selected_tag = tag
+        self._apply_selection_highlight()
+        self._log(f"Selected {self.selected_card.name} from {self.game.players[player_idx].name}'s hand.")
 
     def _start_drag(self, event: tk.Event, player_idx: int, tag: str) -> None:
         if self.active_index != player_idx or player_idx != self.human_index:
@@ -279,7 +296,8 @@ class GameGUI:
         if not card:
             return
         if self.drag_state.hovered_target is not None:
-            self._play_card(player_idx, card)
+            if self._play_card(player_idx, card):
+                self._clear_selection()
         self._highlight_drop_zone(None)
         self._destroy_drag_preview()
         self._render_hand(player_idx)
@@ -295,19 +313,24 @@ class GameGUI:
         self._render_player(self.human_index)
 
     def play_selected(self) -> None:
-        if not self.selected_card:
+        if not self.selected_card or self.selected_player_idx != self.human_index:
             self._log("No card selected.")
             return
         if not self._assert_human_turn():
             return
-        self._play_card(self.human_index, self.selected_card)
-        self.selected_card = None
+        player = self.game.players[self.selected_player_idx]
+        if self.selected_card not in player.hand:
+            self._log("Selected card is no longer in hand.")
+            self._clear_selection()
+            return
+        if self._play_card(self.selected_player_idx, self.selected_card):
+            self._clear_selection()
 
-    def _play_card(self, player_idx: int, card: Card) -> None:
+    def _play_card(self, player_idx: int, card: Card) -> bool:
         player = self.game.players[player_idx]
         if card not in player.hand:
             self._log("Card is no longer in hand.")
-            return
+            return False
 
         message: Optional[str] = None
         if isinstance(card, TerritoryCard):
@@ -316,19 +339,19 @@ class GameGUI:
         elif isinstance(card, Cryptid):
             if not card.can_play(player.resources):
                 self._log(f"Cannot afford {card.name}.")
-                return
+                return False
             player.hand.remove(card)
             message = player.summon(card, self.game.stack)
         elif isinstance(card, EventCard):
             if not card.can_play(player.resources):
                 self._log(f"Cannot afford {card.name}.")
-                return
+                return False
             player.hand.remove(card)
             message = player.cast_event(card, self.game.stack)
         elif isinstance(card, GodCard):
             if not card.can_play(player.resources):
                 self._log(f"Cannot afford {card.name}.")
-                return
+                return False
             player.hand.remove(card)
             message = player.play_god(card, self.game.stack)
 
@@ -336,6 +359,23 @@ class GameGUI:
             self._log(message)
         self.resolve_stack()
         self._render_player(player_idx)
+        return True
+
+    def _apply_selection_highlight(self) -> None:
+        if self.selected_player_idx is None or not self.selected_tag:
+            return
+        canvas = self.hand_canvases[self.selected_player_idx]
+        if canvas.find_withtag(self.selected_tag):
+            canvas.itemconfigure(self.selected_tag, outline="#ff8800", width=3)
+
+    def _clear_selection(self) -> None:
+        if self.selected_player_idx is not None and self.selected_tag:
+            canvas = self.hand_canvases[self.selected_player_idx]
+            if canvas.find_withtag(self.selected_tag):
+                canvas.itemconfigure(self.selected_tag, outline="#6666aa", width=1)
+        self.selected_card = None
+        self.selected_player_idx = None
+        self.selected_tag = None
 
     def play_queued_territory(self) -> None:
         if not self._assert_human_turn():
