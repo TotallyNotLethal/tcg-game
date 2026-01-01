@@ -115,3 +115,12 @@ def exemplar_cryptids() -> Dict[str, Cryptid]:
             ],
         ),
     }
+
+
+def starter_deck() -> List[Card]:
+    """Prototype-friendly deck list with duplicated exemplar cryptids."""
+
+    deck: List[Card] = []
+    for _ in range(2):  # two copies of each exemplar
+        deck.extend(exemplar_cryptids().values())
+    return deck

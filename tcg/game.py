@@ -4,7 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Tuple
 
-from .cards import Card, CardType, Cryptid, exemplar_cryptids
+import random
+
+from .cards import Card, Cryptid, starter_deck
 from .phases import Phase, PhaseLoop
 from .resources import ResourcePool
 from .stack import GameStack, StackItem
@@ -17,6 +19,9 @@ class PlayerState:
     resources: ResourcePool = field(default_factory=ResourcePool)
     battlefield: List[Card] = field(default_factory=list)
     territories: List[Territory] = field(default_factory=list)
+    territory_queue: List[Territory] = field(default_factory=list)
+    deck: List[Card] = field(default_factory=list)
+    hand: List[Card] = field(default_factory=list)
 
     def play_territory(self, territory: Territory, stack: GameStack) -> str:
         self.territories.append(territory)
@@ -34,6 +39,24 @@ class PlayerState:
             stack.push(trigger)
         return f"{self.name} summons {cryptid.name}."
 
+    def draw(self, count: int = 1) -> List[str]:
+        log: List[str] = []
+        for _ in range(count):
+            if not self.deck:
+                log.append(f"{self.name} would draw but the deck is empty.")
+                break
+            card = self.deck.pop(0)
+            self.hand.append(card)
+            log.append(f"{self.name} draws {card.name}.")
+        return log
+
+    def play_first_affordable(self, stack: GameStack) -> str:
+        for card in list(self.hand):
+            if isinstance(card, Cryptid) and card.can_play(self.resources):
+                self.hand.remove(card)
+                return self.summon(card, stack)
+        return f"{self.name} holds position, hand: {', '.join(c.name for c in self.hand) or 'empty'}; resources: {self.resources.describe()}."
+
 
 @dataclass
 class GameState:
@@ -49,7 +72,7 @@ class GameState:
         active, opposing = self.players[self.turn % 2], self.players[(self.turn + 1) % 2]
         for phase in self.phases:
             if phase == Phase.START:
-                log.append(f"{active.name} draws momentum (placeholder).")
+                log.extend(active.draw())
             elif phase == Phase.MAIN:
                 log.extend(self._run_main_phase(active))
             elif phase == Phase.COMBAT:
@@ -63,17 +86,13 @@ class GameState:
     def _run_main_phase(self, player: PlayerState) -> List[str]:
         log: List[str] = []
         # Auto-play first territory if available
-        if player.territories:
-            territory = player.territories.pop(0)
+        if player.territory_queue:
+            territory = player.territory_queue.pop(0)
             log.append(player.play_territory(territory, self.stack))
-        # Auto-summon the first affordable cryptid
-        for card in list(player.battlefield):
-            pass  # placeholder for future actions
-        affordable = [c for c in exemplar_cryptids().values() if c.can_play(player.resources)]
-        if affordable:
-            log.append(player.summon(affordable[0], self.stack))
+        if player.hand:
+            log.append(player.play_first_affordable(self.stack))
         else:
-            log.append(f"{player.name} holds position, resources: {player.resources.describe()}.")
+            log.append(f"{player.name} has no cards in hand.")
         return log
 
 
@@ -81,8 +100,12 @@ def initial_game() -> GameState:
     alice = PlayerState(name="Alice")
     bob = PlayerState(name="Bob")
     # Seed players with starter territories
-    alice.territories.extend(
+    alice.territory_queue.extend(
         [belief_territory("Lighthouse Perch", 1), fear_territory("Shadowed Dock", 1)]
     )
-    bob.territories.extend([fear_territory("Forgotten Alley", 1), belief_territory("Candlelit Library", 1)])
+    bob.territory_queue.extend([fear_territory("Forgotten Alley", 1), belief_territory("Candlelit Library", 1)])
+    for player in (alice, bob):
+        player.deck.extend(starter_deck())
+        random.shuffle(player.deck)
+        player.draw(3)
     return GameState(players=(alice, bob))
