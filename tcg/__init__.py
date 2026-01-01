@@ -10,7 +10,11 @@ __all__ = [
     "Card",
     "CardType",
     "Cryptid",
+    "EventCard",
     "starter_deck",
+    "build_deck",
+    "card_library",
+    "deck_templates",
     "GameState",
 ]
 
@@ -18,5 +22,5 @@ from .phases import Phase, PhaseLoop
 from .stack import GameStack, StackItem
 from .resources import ResourcePool
 from .territory import Territory
-from .cards import Card, CardType, Cryptid, starter_deck
+from .cards import Card, CardType, Cryptid, EventCard, starter_deck, build_deck, card_library, deck_templates
 from .game import GameState
