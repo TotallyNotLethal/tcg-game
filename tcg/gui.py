@@ -32,6 +32,7 @@ class GameGUI:
         self.selected_player_idx: Optional[int] = None
         self.selected_tag: Optional[str] = None
         self.preview_window: Optional[tk.Toplevel] = None
+        self.detail_window: Optional[tk.Toplevel] = None
         self.drop_zone_boxes: Dict[int, tuple[int, int, int, int]] = {}
         self.drop_zone_items: Dict[int, tuple[int, int]] = {}
         self.drop_zone_screen_bounds: Dict[int, tuple[int, int, int, int]] = {}
@@ -267,6 +268,7 @@ class GameGUI:
         self.selected_tag = tag
         self._apply_selection_highlight()
         self._log(f"Selected {self.selected_card.name} from {self.game.players[player_idx].name}'s hand.")
+        self._show_card_details(card)
 
     def _start_drag(self, event: tk.Event, player_idx: int, tag: str) -> None:
         if self.active_index != player_idx or player_idx != self.human_index:
@@ -376,6 +378,95 @@ class GameGUI:
         self.selected_card = None
         self.selected_player_idx = None
         self.selected_tag = None
+        self._close_detail_window()
+
+    def _format_cost(self, card: Card) -> str:
+        parts = []
+        if card.cost_fear:
+            parts.append(f"{card.cost_fear} Fear")
+        if card.cost_belief:
+            parts.append(f"{card.cost_belief} Belief")
+        return ", ".join(parts) if parts else "Free"
+
+    def _close_detail_window(self) -> None:
+        if self.detail_window:
+            self.detail_window.destroy()
+            self.detail_window = None
+
+    def _show_card_details(self, card: Card) -> None:
+        self._close_detail_window()
+        self.detail_window = tk.Toplevel(self.root)
+        self.detail_window.title(f"{card.name} Details")
+        container = tk.Frame(self.detail_window, padx=10, pady=10)
+        container.pack(fill=tk.BOTH, expand=True)
+
+        tk.Label(container, text=card.name, font=("Arial", 14, "bold")).pack(anchor="w")
+        type_cost = f"Type: {card.type.name.title()} | Cost: {self._format_cost(card)}"
+        tk.Label(container, text=type_cost, font=("Arial", 10)).pack(anchor="w", pady=(2, 6))
+
+        if card.faction:
+            tk.Label(container, text=f"Faction: {card.faction}", font=("Arial", 10, "italic")).pack(anchor="w")
+        if card.tags:
+            tk.Label(container, text=f"Tags: {', '.join(card.tags)}", font=("Arial", 10)).pack(anchor="w")
+
+        if card.text:
+            tk.Label(
+                container,
+                text=card.text,
+                wraplength=380,
+                justify=tk.LEFT,
+                font=("Arial", 10),
+            ).pack(anchor="w", pady=(6, 6))
+
+        if isinstance(card, TerritoryCard):
+            yields = []
+            if card.fear_yield:
+                yields.append(f"{card.fear_yield} Fear")
+            if card.belief_yield:
+                yields.append(f"{card.belief_yield} Belief")
+            yield_text = ", ".join(yields) if yields else "None"
+            tk.Label(container, text=f"Yields: {yield_text}", font=("Arial", 10, "bold")).pack(anchor="w")
+
+        if isinstance(card, Cryptid):
+            tk.Label(container, text=f"Stats: {card.stats.describe()}", font=("Arial", 10, "bold")).pack(anchor="w")
+            tk.Label(container, text=f"Current HP: {card.current_health}", font=("Arial", 10)).pack(anchor="w")
+            if card.moves:
+                moves_frame = tk.LabelFrame(container, text="Moves")
+                moves_frame.pack(fill=tk.BOTH, expand=True, pady=(6, 4))
+                for move in card.moves:
+                    tk.Label(
+                        moves_frame,
+                        text=move.describe(),
+                        wraplength=360,
+                        justify=tk.LEFT,
+                        anchor="w",
+                    ).pack(anchor="w", padx=6, pady=2)
+            if card.branches:
+                branches_frame = tk.LabelFrame(container, text="Branches")
+                branches_frame.pack(fill=tk.BOTH, expand=True, pady=(4, 4))
+                for branch in card.branches:
+                    tk.Label(
+                        branches_frame,
+                        text=f"{branch.name} — {branch.trigger}: {branch.effect_text}",
+                        wraplength=360,
+                        justify=tk.LEFT,
+                        anchor="w",
+                    ).pack(anchor="w", padx=6, pady=2)
+
+        if isinstance(card, EventCard):
+            impact = card.impact_text or card.text
+            tk.Label(container, text=f"Impact: {impact}", wraplength=380, justify=tk.LEFT).pack(anchor="w")
+
+        if isinstance(card, GodCard):
+            if card.prayer_text:
+                tk.Label(
+                    container,
+                    text=f"Prayer: {card.prayer_text}",
+                    wraplength=380,
+                    justify=tk.LEFT,
+                ).pack(anchor="w")
+
+        tk.Button(container, text="Close", command=self._close_detail_window).pack(anchor="e", pady=(10, 0))
 
     def play_queued_territory(self) -> None:
         if not self._assert_human_turn():
