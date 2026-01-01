@@ -525,6 +525,372 @@ def cryptid_pool() -> Dict[str, Cryptid]:
                 ),
             ],
         ),
+        "Ashen Jackalope": Cryptid(
+            name="Ashen Jackalope",
+            type=CardType.CRYPTID,
+            cost_fear=1,
+            text="Cinder-hopping trickster that slips between sparks.",
+            tags=["Ember", "Trickster"],
+            stats=CombatStats(power=1, resilience=1, health=3, speed=4),
+            moves=[
+                Move(name="Scorch Kick", damage=1, text="Leaves a smoldering trail."),
+                Move(name="Flare Dash", damage=2, cost_fear=1, text="Blink forward in a shower of ash."),
+            ],
+            branches=[
+                Branch(
+                    name="Smoke Screen",
+                    trigger="When targeted",
+                    effect_text="Phases out until end of turn and gains +1 speed.",
+                ),
+                Branch(
+                    name="Fire Trail",
+                    trigger="When you cast an Event",
+                    effect_text="Deal 1 damage to an opponent's cryptid.",
+                ),
+            ],
+        ),
+        "Quartz Stag": Cryptid(
+            name="Quartz Stag",
+            type=CardType.CRYPTID,
+            cost_belief=2,
+            text="Crystal-horned guardian that refracts prayers.",
+            tags=["Crystal", "Guardian"],
+            stats=CombatStats(power=2, resilience=3, health=6, defense=1, speed=2),
+            moves=[
+                Move(name="Prismatic Gore", damage=2, text="Splits damage between two targets."),
+                Move(name="Radiant Trample", damage=3, cost_belief=1, text="Crushes with gleaming antlers."),
+            ],
+            branches=[
+                Branch(
+                    name="Gem Ward",
+                    trigger="When you gain belief",
+                    effect_text="Grant an ally +1 defense this turn.",
+                ),
+                Branch(
+                    name="Refraction",
+                    trigger="When you pray",
+                    effect_text="Copy that prayer's effect for a second target.",
+                ),
+            ],
+        ),
+        "Gutter Ghoul": Cryptid(
+            name="Gutter Ghoul",
+            type=CardType.CRYPTID,
+            cost_fear=1,
+            text="Alley-born haunter that feeds on discarded hope.",
+            tags=["Urban", "Undead"],
+            stats=CombatStats(power=2, resilience=1, health=4, speed=2),
+            moves=[
+                Move(name="Filth Swipe", damage=1, text="Sickly scratch that festers."),
+                Move(name="Drain Essence", damage=2, cost_fear=1, text="Steals 1 influence when it hits."),
+            ],
+            branches=[
+                Branch(
+                    name="Trash Dive",
+                    trigger="When you discard",
+                    effect_text="Return Gutter Ghoul from scrapyard to your hand.",
+                ),
+                Branch(
+                    name="Shadow Snack",
+                    trigger="At end step",
+                    effect_text="If an opponent lost influence, gain 1 fear.",
+                ),
+            ],
+        ),
+        "Stormcoil Leviathan": Cryptid(
+            name="Stormcoil Leviathan",
+            type=CardType.CRYPTID,
+            cost_fear=3,
+            cost_belief=1,
+            text="Oceanic colossus channeling furious tempests.",
+            tags=["Aquatic", "Mythic"],
+            stats=CombatStats(power=5, resilience=4, health=10, defense=2, speed=2),
+            moves=[
+                Move(name="Tidal Crush", damage=5, text="Washes foes off the field."),
+                Move(name="Maelstrom", damage=6, cost_fear=1, text="Spins up currents that stagger all enemies."),
+            ],
+            branches=[
+                Branch(
+                    name="Depths Awaken",
+                    trigger="When Instability >= 3",
+                    effect_text="Tap two opposing Territories and deal 2 to each cryptid.",
+                ),
+                Branch(
+                    name="Calm Eye",
+                    trigger="When Instability is 0",
+                    effect_text="Heal 3 damage divided among your cryptids.",
+                ),
+            ],
+        ),
+        "Cinder Roc": Cryptid(
+            name="Cinder Roc",
+            type=CardType.CRYPTID,
+            cost_fear=2,
+            cost_belief=1,
+            text="Ash-winged bird that blots out the sky.",
+            tags=["Sky", "Ember"],
+            stats=CombatStats(power=3, resilience=2, health=6, speed=4),
+            moves=[
+                Move(name="Ember Rain", damage=3, text="Showers the ground with cinders."),
+                Move(name="Crater Dive", damage=4, cost_fear=1, text="Slams down, leaving molten glass."),
+            ],
+            branches=[
+                Branch(
+                    name="Thermal Updraft",
+                    trigger="When a Territory enters",
+                    effect_text="Ready Cinder Roc and give it +1 speed this turn.",
+                ),
+                Branch(
+                    name="Ash Blanket",
+                    trigger="When an Event resolves",
+                    effect_text="Reduce all incoming damage to your cryptids by 1 this turn.",
+                ),
+            ],
+        ),
+        "Hearthbound Sprite": Cryptid(
+            name="Hearthbound Sprite",
+            type=CardType.CRYPTID,
+            cost_belief=1,
+            text="Tiny household spirit that rewards kindness.",
+            tags=["Spirit", "Support"],
+            stats=CombatStats(power=1, resilience=2, health=4, speed=3),
+            moves=[
+                Move(name="Kindle", damage=1, text="Bolsters allies with warmth."),
+                Move(name="Comforting Glow", damage=0, cost_belief=1, text="Prevent 2 damage to an ally this turn."),
+            ],
+            branches=[
+                Branch(
+                    name="Shared Meal",
+                    trigger="When you gain belief",
+                    effect_text="Each player may draw a card; you gain 1 influence.",
+                ),
+                Branch(
+                    name="Warm Floor",
+                    trigger="At end step",
+                    effect_text="Heal 1 damage from up to two friendly cryptids.",
+                ),
+            ],
+        ),
+        "Obsidian Beetle": Cryptid(
+            name="Obsidian Beetle",
+            type=CardType.CRYPTID,
+            cost_fear=1,
+            cost_belief=1,
+            text="Glass-shelled scarab that channels volcanic wards.",
+            tags=["Carapace", "Ward"],
+            stats=CombatStats(power=2, resilience=2, health=5, defense=2, speed=1),
+            moves=[
+                Move(name="Shard Slash", damage=2, text="Cuts with razor shards."),
+                Move(name="Molten Carapace", damage=0, cost_belief=1, text="Gain +2 defense until end of turn."),
+            ],
+            branches=[
+                Branch(
+                    name="Heat Shield",
+                    trigger="When you spend fear",
+                    effect_text="Prevent the next 1 damage to any target.",
+                ),
+                Branch(
+                    name="Burrowed Cache",
+                    trigger="When Obsidian Beetle blocks",
+                    effect_text="Discover a Territory and put it into your hand.",
+                ),
+            ],
+        ),
+        "Grave Lantern": Cryptid(
+            name="Grave Lantern",
+            type=CardType.CRYPTID,
+            cost_fear=2,
+            text="Floating lamp that guides spirits and siphons courage.",
+            tags=["Undead", "Illusion"],
+            stats=CombatStats(power=1, resilience=2, health=5, defense=1, speed=2),
+            moves=[
+                Move(name="Soul Wisp", damage=1, text="Chills foes and marks them."),
+                Move(name="Lantern Drain", damage=3, cost_fear=1, text="Pulls belief from the living."),
+            ],
+            branches=[
+                Branch(
+                    name="Guiding Light",
+                    trigger="When a cryptid dies",
+                    effect_text="Gain 1 belief and scry 1.",
+                ),
+                Branch(
+                    name="Haunting Beam",
+                    trigger="When you lose influence",
+                    effect_text="Deal 1 damage to each opposing cryptid.",
+                ),
+            ],
+        ),
+        "Skyline Phantom": Cryptid(
+            name="Skyline Phantom",
+            type=CardType.CRYPTID,
+            cost_fear=1,
+            cost_belief=1,
+            text="Urban legend that jumps rooftops with spectral ease.",
+            tags=["Urban", "Sky"],
+            stats=CombatStats(power=2, resilience=1, health=4, speed=4),
+            moves=[
+                Move(name="Parkour Strike", damage=2, text="Leaps through alleys to surprise foes."),
+                Move(name="Billboard Drop", damage=3, cost_fear=1, text="Crashes signage for splash damage."),
+            ],
+            branches=[
+                Branch(
+                    name="Rooftop Glide",
+                    trigger="When you control a Sky tag cryptid",
+                    effect_text="Gain flying and +1 speed this turn.",
+                ),
+                Branch(
+                    name="Graffiti Signal",
+                    trigger="When you cast Intel",
+                    effect_text="Draw a card then discard a card.",
+                ),
+            ],
+        ),
+        "Crystal Tortoise": Cryptid(
+            name="Crystal Tortoise",
+            type=CardType.CRYPTID,
+            cost_belief=2,
+            text="Slow bulwark that turns belief into shields.",
+            tags=["Crystal", "Guardian"],
+            stats=CombatStats(power=1, resilience=4, health=7, defense=3, speed=1),
+            moves=[
+                Move(name="Shell Bash", damage=2, text="Knocks enemies off balance."),
+                Move(name="Gem Shell", damage=0, cost_belief=1, text="Reduce damage taken by 2 this turn."),
+            ],
+            branches=[
+                Branch(
+                    name="Reflective Plating",
+                    trigger="When you gain defense",
+                    effect_text="Deal 1 damage back to the source.",
+                ),
+                Branch(
+                    name="Steady March",
+                    trigger="When you play a Territory",
+                    effect_text="Crystal Tortoise gains +1/+1 until end of turn.",
+                ),
+            ],
+        ),
+        "Tidal Courser": Cryptid(
+            name="Tidal Courser",
+            type=CardType.CRYPTID,
+            cost_belief=1,
+            text="Wave-skimming steed that carries riders over danger.",
+            tags=["Aquatic", "Mount"],
+            stats=CombatStats(power=2, resilience=2, health=5, speed=3),
+            moves=[
+                Move(name="Spray Kick", damage=2, text="Splashes saltwater into wounds."),
+                Move(name="Crest Leap", damage=3, cost_belief=1, text="Jump the tide, dodging blockers."),
+            ],
+            branches=[
+                Branch(
+                    name="Rider's Bond",
+                    trigger="When paired with a Guardian",
+                    effect_text="Both gain ward until end of turn.",
+                ),
+                Branch(
+                    name="Tidecall",
+                    trigger="When an Event is cast",
+                    effect_text="Untap a Territory and add 1 belief.",
+                ),
+            ],
+        ),
+        "Riftblade Nomad": Cryptid(
+            name="Riftblade Nomad",
+            type=CardType.CRYPTID,
+            cost_fear=1,
+            cost_belief=1,
+            text="Traveler stepping between fractures in reality.",
+            tags=["Walker", "Blade"],
+            stats=CombatStats(power=3, resilience=1, health=4, speed=4),
+            moves=[
+                Move(name="Phase Cut", damage=3, text="Slices through magical wards."),
+                Move(name="Planar Slip", damage=2, cost_belief=1, text="Blink to avoid retaliation."),
+            ],
+            branches=[
+                Branch(
+                    name="Worldskip",
+                    trigger="When Instability changes",
+                    effect_text="Exile and return Riftblade Nomad to the battlefield.",
+                ),
+                Branch(
+                    name="Blade Lesson",
+                    trigger="When you draw your second card each turn",
+                    effect_text="Gain +1 power until end of turn.",
+                ),
+            ],
+        ),
+        "Sandseer Dervish": Cryptid(
+            name="Sandseer Dervish",
+            type=CardType.CRYPTID,
+            cost_fear=1,
+            text="Desert prophet that reads storms and ruins.",
+            tags=["Desert", "Scholar"],
+            stats=CombatStats(power=1, resilience=2, health=4, speed=3),
+            moves=[
+                Move(name="Scouring Dance", damage=1, text="Cuts with swirling grit."),
+                Move(name="Dust Vision", damage=0, cost_belief=1, text="Scry 2 then draw a card."),
+            ],
+            branches=[
+                Branch(
+                    name="Storm Reading",
+                    trigger="When an Event is cast",
+                    effect_text="Gain +1 speed and tap an opposing Territory.",
+                ),
+                Branch(
+                    name="Mirage Warning",
+                    trigger="When targeted",
+                    effect_text="Counter that spell unless its controller pays 1 belief.",
+                ),
+            ],
+        ),
+        "Frostbyte Hacker": Cryptid(
+            name="Frostbyte Hacker",
+            type=CardType.CRYPTID,
+            cost_belief=1,
+            text="Techno-wraith that disrupts resource grids.",
+            tags=["Machine", "Frost"],
+            stats=CombatStats(power=2, resilience=1, health=4, speed=3),
+            moves=[
+                Move(name="Signal Jam", damage=1, text="Opponents lose 1 speed on their next attack."),
+                Move(name="Cold Injection", damage=2, cost_belief=1, text="Freeze a Territory; it won't ready next turn."),
+            ],
+            branches=[
+                Branch(
+                    name="Firewall Crash",
+                    trigger="When you spend belief on an Event",
+                    effect_text="Drain 1 fear from opponent and add it to your pool.",
+                ),
+                Branch(
+                    name="Debug Shell",
+                    trigger="When you control another Machine",
+                    effect_text="Gain +1 defense until end of turn.",
+                ),
+            ],
+        ),
+        "Lanternbound Monk": Cryptid(
+            name="Lanternbound Monk",
+            type=CardType.CRYPTID,
+            cost_belief=1,
+            cost_fear=1,
+            text="Pilgrim tending the lights between worlds.",
+            tags=["Monk", "Illusion"],
+            stats=CombatStats(power=2, resilience=2, health=5, speed=2),
+            moves=[
+                Move(name="Lantern Jab", damage=2, text="Short strikes that dazzle."),
+                Move(name="Bridge the Gap", damage=0, cost_belief=1, text="Each player draws a card; gain 1 belief."),
+            ],
+            branches=[
+                Branch(
+                    name="Meditative Step",
+                    trigger="At end step",
+                    effect_text="If you spent both fear and belief, heal 1 influence.",
+                ),
+                Branch(
+                    name="Pilgrim's Lantern",
+                    trigger="When a God enters",
+                    effect_text="Search your deck for a Territory and put it into play tapped.",
+                ),
+            ],
+        ),
     }
 
 
@@ -612,6 +978,47 @@ def event_pool() -> Dict[str, EventCard]:
             tags=["Ritual", "Exploration"],
             impact_text="Create a basic Territory token that taps for either Fear or Belief.",
         ),
+        "Emergency Rally": EventCard(
+            name="Emergency Rally",
+            type=CardType.EVENT,
+            cost_belief=1,
+            cost_fear=1,
+            text="Call every ally to the line at once.",
+            tags=["Tactic", "Support"],
+            impact_text="Your cryptids get +1 power this turn and you gain 2 influence.",
+        ),
+        "Memory Leak": EventCard(
+            name="Memory Leak",
+            type=CardType.EVENT,
+            cost_fear=1,
+            text="Overwhelm foes with half-remembered nightmares.",
+            tags=["Shadow", "Intel"],
+            impact_text="Target opponent discards a card at random and loses 1 belief.",
+        ),
+        "Moonlit March": EventCard(
+            name="Moonlit March",
+            type=CardType.EVENT,
+            cost_belief=2,
+            text="Procession of lanterns clears the path.",
+            tags=["Devotion", "Rally"],
+            impact_text="Untap up to two cryptids; they gain +1 speed and ward until end of turn.",
+        ),
+        "Shock Sabotage": EventCard(
+            name="Shock Sabotage",
+            type=CardType.EVENT,
+            cost_fear=2,
+            text="Short-circuit enemy engines and tools.",
+            tags=["Machine", "Trap"],
+            impact_text="Tap an opposing Territory and deal 1 damage to each opposing Machine or Guardian.",
+        ),
+        "Quiet Commune": EventCard(
+            name="Quiet Commune",
+            type=CardType.EVENT,
+            cost_belief=1,
+            text="Share stories that knit believers together.",
+            tags=["Ritual", "Support"],
+            impact_text="Draw a card. If you control a God, gain 1 belief and 1 influence.",
+        ),
     }
 
 
@@ -644,6 +1051,28 @@ def territory_card_pool() -> Dict[str, TerritoryCard]:
             type=CardType.TERRITORY,
             text="Broken machinery that still sparks with menace.",
             tags=["Machine", "Urban"],
+            fear_yield=1,
+        ),
+        "Crystal Springs": TerritoryCard(
+            name="Crystal Springs",
+            type=CardType.TERRITORY,
+            text="Pools that amplify gentle faith.",
+            tags=["Water", "Blessed"],
+            belief_yield=1,
+        ),
+        "Howling Barrens": TerritoryCard(
+            name="Howling Barrens",
+            type=CardType.TERRITORY,
+            text="Wind-scoured flats that echo with dread.",
+            tags=["Desert", "Ruin"],
+            fear_yield=1,
+        ),
+        "Pilgrim Crossing": TerritoryCard(
+            name="Pilgrim Crossing",
+            type=CardType.TERRITORY,
+            text="Ancient bridge watched by twin statues.",
+            tags=["Bridge", "Dual"],
+            belief_yield=1,
             fear_yield=1,
         ),
     }
@@ -679,6 +1108,24 @@ def god_pool() -> Dict[str, GodCard]:
             prayer_text="Rewards explorers with insight and safety.",
             prayer_effect=lambda player, opponent: _pray_labyrinth(player),
         ),
+        "Beacon Warden": GodCard(
+            name="Beacon Warden",
+            type=CardType.GOD,
+            cost_belief=2,
+            text="Guardian light that keeps despair at bay.",
+            tags=["Radiant", "God"],
+            prayer_text="Shields allies and renews resolve.",
+            prayer_effect=lambda player, opponent: _pray_beacon(player),
+        ),
+        "Chasm Titan": GodCard(
+            name="Chasm Titan",
+            type=CardType.GOD,
+            cost_fear=3,
+            text="Slumbering titan beneath the fissures.",
+            tags=["Earth", "God"],
+            prayer_text="Shakes the ground to punish greed.",
+            prayer_effect=lambda player, opponent: _pray_chasm(player, opponent),
+        ),
     }
 
 
@@ -711,6 +1158,28 @@ def _pray_labyrinth(player: object) -> str:
     return "Labyrinth Mother grants 1 belief and whispers a safe path forward."
 
 
+def _pray_beacon(player: object) -> str:
+    player.resources.add(belief=1)
+    healed = False
+    for card in getattr(player, "battlefield", []):
+        if isinstance(card, Cryptid):
+            card.current_health = min(card.stats.health, card.current_health + 2)
+            healed = True
+    influence_text = " and 1 influence" if hasattr(player, "influence") else ""
+    return f"Beacon Warden grants 1 belief{influence_text} and {'heals allies' if healed else 'bolsters the faithful'}."
+
+
+def _pray_chasm(player: object, opponent: object) -> str:
+    player.resources.add(fear=1)
+    if hasattr(opponent, "territories"):
+        destroyed = min(1, len(getattr(opponent, "territories", [])))
+        if destroyed:
+            opponent.territories = opponent.territories[destroyed:]
+    if hasattr(opponent, "influence"):
+        opponent.influence = max(0, opponent.influence - 3)
+    return "Chasm Titan rumbles; an opposing territory crumbles and 3 influence is lost."
+
+
 def card_library() -> Dict[str, Card]:
     library: Dict[str, Card] = {}
     library.update(cryptid_pool())
@@ -734,6 +1203,9 @@ def deck_templates() -> Dict[str, Dict[str, int]]:
             "Shadow Report": 2,
             "Trailblaze Expedition": 2,
             "Instability Pulse": 2,
+            "Quiet Commune": 2,
+            "Ashen Jackalope": 1,
+            "Hearthbound Sprite": 1,
         },
         "fear_pressure": {
             "Haunted Cairn": 4,
@@ -748,6 +1220,8 @@ def deck_templates() -> Dict[str, Dict[str, int]]:
             "Mire Ambush": 2,
             "Dread Patron": 2,
             "Relic Harvest": 2,
+            "Gutter Ghoul": 2,
+            "Memory Leak": 2,
         },
         "belief_ramp": {
             "Sacred Grove": 4,
@@ -763,20 +1237,25 @@ def deck_templates() -> Dict[str, Dict[str, int]]:
             "Lantern Festival": 3,
             "Guided Study": 3,
             "Prayer Vigil": 2,
+            "Hearthbound Sprite": 2,
+            "Quartz Stag": 2,
         },
         "godline": {
-            "Sacred Grove": 4,
+            "Sacred Grove": 2,
             "Haunted Cairn": 2,
             "Dawning Shrine": 4,
+            "Pilgrim Crossing": 2,
             "Aurora Paragon": 2,
             "Dread Patron": 2,
             "Labyrinth Mother": 2,
+            "Beacon Warden": 2,
             "Sunscale Drake": 2,
             "Night Weaver": 2,
             "Ridgeback Gryphon": 2,
             "Trailblaze Expedition": 3,
             "Prayer Vigil": 3,
             "Instability Pulse": 2,
+            "Emergency Rally": 2,
         },
         "exploration": {
             "Sacred Grove": 2,
@@ -791,6 +1270,38 @@ def deck_templates() -> Dict[str, Dict[str, int]]:
             "Relic Harvest": 3,
             "Stormwatch Report": 2,
             "Labyrinth Mother": 2,
+            "Riftblade Nomad": 2,
+            "Sandseer Dervish": 2,
+            "Tidal Courser": 2,
+            "Pilgrim Crossing": 2,
+        },
+        "urban_legends": {
+            "Industrial Ruins": 2,
+            "Pilgrim Crossing": 2,
+            "Howling Barrens": 2,
+            "Gutter Ghoul": 3,
+            "Skyline Phantom": 3,
+            "Frostbyte Hacker": 2,
+            "Obsidian Beetle": 2,
+            "Lanternbound Monk": 2,
+            "Memory Leak": 3,
+            "Shock Sabotage": 2,
+            "Relic Harvest": 2,
+            "Chasm Titan": 1,
+        },
+        "radiant_procession": {
+            "Sacred Grove": 4,
+            "Crystal Springs": 2,
+            "Dawning Shrine": 2,
+            "Tidal Courser": 2,
+            "Quartz Stag": 2,
+            "Hearthbound Sprite": 3,
+            "Crystal Tortoise": 2,
+            "Cinder Roc": 2,
+            "Beacon Warden": 2,
+            "Lantern Festival": 2,
+            "Quiet Commune": 3,
+            "Moonlit March": 3,
         },
     }
 

@@ -29,7 +29,15 @@ if __name__ == "__main__":
         "--deck",
         type=str,
         default="balanced",
-        choices=["balanced", "fear_pressure", "belief_ramp", "godline", "exploration"],
+        choices=[
+            "balanced",
+            "fear_pressure",
+            "belief_ramp",
+            "godline",
+            "exploration",
+            "urban_legends",
+            "radiant_procession",
+        ],
         help="Deck template to use",
     )
     parser.add_argument(

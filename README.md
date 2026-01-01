@@ -14,6 +14,8 @@ python console_sim.py
 python console_sim.py --until-win --max-turns 25
 ```
 
+Deck templates now include `balanced`, `fear_pressure`, `belief_ramp`, `godline`, `exploration`, `urban_legends`, and `radiant_procession` (pass template name to `initial_game`, `starter_deck`, or the simulator CLI).
+
 This seeds two players (Alice and Bob) with shuffled starter decks, a small opening hand, and queued territories, then runs scripted turns to showcase:
 - Phase progression (start, main, combat, end)
 - Territory resource generation for Fear/Belief (including land-like Territory cards) and derived Instability
@@ -26,4 +28,15 @@ This seeds two players (Alice and Bob) with shuffled starter decks, a small open
 - Territory cards act like lands/energy and sit alongside queued Territories to feed the dual Fear/Belief economy
 - God cards can be prayed to for blessings (healing, influence drain, guidance) and synergize with devotion events
 - Exploration and ritual events fetch shrines, create temporary territories, or buff specific tribes for the combat step
-- Deck templates: `balanced`, `fear_pressure`, `belief_ramp`, `godline`, `exploration` (pass template name to `initial_game` or `starter_deck`)
+- Deck templates: `balanced`, `fear_pressure`, `belief_ramp`, `godline`, `exploration`, `urban_legends`, `radiant_procession` (pass template name to `initial_game` or `starter_deck`)
+
+## GUI Prototype
+An interactive Tkinter GUI supports drag-to-play, stack resolution, and god prayers without leaving the keyboard.
+
+```bash
+python -m tcg.gui
+```
+
+- Drag cards from the active player's hand canvas into their battlefield to play them if affordable.
+- Use the control bar to draw, play queued territories, pray with gods, resolve the stack, and toggle turns.
+- Resource, influence, and battlefield summaries update live for both players.
