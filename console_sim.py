@@ -22,7 +22,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the cryptid TCG console simulator")
     parser.add_argument("--turns", type=int, default=3, help="Number of turns to simulate")
     parser.add_argument(
-        "--deck", type=str, default="balanced", choices=["balanced", "fear_pressure", "belief_ramp"], help="Deck template to use"
+        "--deck",
+        type=str,
+        default="balanced",
+        choices=["balanced", "fear_pressure", "belief_ramp", "godline", "exploration"],
+        help="Deck template to use",
     )
     args = parser.parse_args()
     run_simulation(turns=args.turns, deck_template=args.deck)
