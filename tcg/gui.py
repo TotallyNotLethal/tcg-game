@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import tkinter as tk
 from dataclasses import dataclass
-from typing import Dict, Optional
+from pathlib import Path
+from typing import Dict, Optional, Tuple
 
 from .cards import Card, Cryptid, EventCard, GodCard, TerritoryCard
 from .game import GameState, initial_game
@@ -36,6 +37,7 @@ class GameGUI:
         self.drop_zone_boxes: Dict[int, tuple[int, int, int, int]] = {}
         self.drop_zone_items: Dict[int, tuple[int, int]] = {}
         self.drop_zone_screen_bounds: Dict[int, tuple[int, int, int, int]] = {}
+        self._image_cache: Dict[Tuple[str, int, int], tk.PhotoImage] = {}
 
         self._build_layout()
         self._render_all()
@@ -115,16 +117,28 @@ class GameGUI:
         for i, card in enumerate(player.battlefield):
             x = 10 + i * 130
             y = 10
-            rect = canvas.create_rectangle(x, y, x + 120, y + 110, fill="#d9f7d9", outline="#4a7b4a")
+            rect = canvas.create_rectangle(x, y, x + 120, y + 130, fill="#d9f7d9", outline="#4a7b4a")
             canvas.create_text(x + 60, y + 15, text=card.name, font=("Arial", 10, "bold"))
-            canvas.create_text(x + 60, y + 40, text=card.text[:40] + ("..." if len(card.text) > 40 else ""), width=110)
-            if isinstance(card, Cryptid):
-                canvas.create_text(x + 60, y + 70, text=card.stats.describe(), fill="#1f4b99")
-                canvas.create_text(x + 60, y + 95, text=f"Current HP: {card.current_health}", fill="#b03060")
-            elif isinstance(card, GodCard):
-                canvas.create_text(x + 60, y + 80, text=card.prayer_text or card.text, width=110)
+            image = self._get_card_image(card, 80, 60)
+            if image:
+                canvas.create_image(x + 60, y + 50, image=image)
+                desc_y = y + 95
             else:
-                canvas.create_text(x + 60, y + 80, text=card.text, width=110)
+                desc_y = y + 70
+            canvas.create_text(
+                x + 60,
+                desc_y,
+                text=card.text[:40] + ("..." if len(card.text) > 40 else ""),
+                width=110,
+            )
+            stats_y = desc_y + 18
+            if isinstance(card, Cryptid):
+                canvas.create_text(x + 60, stats_y, text=card.stats.describe(), fill="#1f4b99")
+                canvas.create_text(x + 60, stats_y + 18, text=f"Current HP: {card.current_health}", fill="#b03060")
+            elif isinstance(card, GodCard):
+                canvas.create_text(x + 60, stats_y, text=card.prayer_text or card.text, width=110)
+            else:
+                canvas.create_text(x + 60, stats_y, text=card.text, width=110)
             canvas.itemconfigure(rect, tags=(f"bf_{idx}_{i}",))
 
     def _draw_drop_zone(self, idx: int) -> None:
@@ -180,6 +194,31 @@ class GameGUI:
             text_color = "#0f2b5c" if is_active else "#1f4b99"
             canvas.itemconfigure(rect_id, fill=fill, outline=outline)
             canvas.itemconfigure(label_id, fill=text_color)
+
+    def _get_card_image(self, card: Card, max_width: int, max_height: int) -> Optional[tk.PhotoImage]:
+        path = Path(card.asset_path())
+        if not path.exists():
+            return None
+
+        cache_key = (str(path), max_width, max_height)
+        if cache_key in self._image_cache:
+            return self._image_cache[cache_key]
+
+        try:
+            image = tk.PhotoImage(file=str(path))
+        except tk.TclError:
+            return None
+
+        scale_factor = max(
+            (image.width() + max_width - 1) // max_width,
+            (image.height() + max_height - 1) // max_height,
+            1,
+        )
+        if scale_factor > 1:
+            image = image.subsample(scale_factor, scale_factor)
+
+        self._image_cache[cache_key] = image
+        return image
 
     def _create_drag_preview(self, card: Optional[Card]) -> None:
         if not card:
@@ -238,8 +277,14 @@ class GameGUI:
             x = 10 + i * 130
             y = 10
             tag = f"hand_{idx}_{i}"
-            rect = canvas.create_rectangle(x, y, x + 120, y + 100, fill="#ffffff", outline="#6666aa", tags=(tag,))
-            text_tag = canvas.create_text(x + 60, y + 50, text=card.name, width=110, tags=(tag,))
+            rect = canvas.create_rectangle(x, y, x + 120, y + 110, fill="#ffffff", outline="#6666aa", tags=(tag,))
+            image = self._get_card_image(card, 60, 45)
+            if image:
+                canvas.create_image(x + 60, y + 40, image=image, tags=(tag,))
+                text_y = y + 80
+            else:
+                text_y = y + 55
+            text_tag = canvas.create_text(x + 60, text_y, text=card.name, width=110, tags=(tag,))
             self.card_tags[(idx, tag)] = card
             canvas.tag_bind(tag, "<Button-1>", lambda e, t=tag, p=idx: self._select_card(p, t))
             canvas.tag_bind(tag, "<ButtonPress-1>", lambda e, t=tag, p=idx: self._start_drag(e, p, t))
@@ -403,6 +448,10 @@ class GameGUI:
         tk.Label(container, text=card.name, font=("Arial", 14, "bold")).pack(anchor="w")
         type_cost = f"Type: {card.type.name.title()} | Cost: {self._format_cost(card)}"
         tk.Label(container, text=type_cost, font=("Arial", 10)).pack(anchor="w", pady=(2, 6))
+
+        image = self._get_card_image(card, 240, 180)
+        if image:
+            tk.Label(container, image=image).pack(anchor="center", pady=(4, 8))
 
         if card.faction:
             tk.Label(container, text=f"Faction: {card.faction}", font=("Arial", 10, "italic")).pack(anchor="w")

@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass, field
 from enum import Enum, auto
+import re
 from typing import Callable, Dict, List, Optional
 
 from .resources import ResourcePool
@@ -15,6 +16,14 @@ class CardType(Enum):
     CRYPTID = auto()
     EVENT = auto()
     GOD = auto()
+
+
+def slugify(name: str) -> str:
+    """Generate a predictable, URL-safe slug for filenames and assets."""
+
+    name = name.lower()
+    name = re.sub(r"[^a-z0-9]+", "-", name)
+    return name.strip("-") or "card"
 
 
 @dataclass
@@ -56,12 +65,18 @@ class Card:
     text: str = ""
     faction: str = ""
     tags: List[str] = field(default_factory=list)
+    image_path: str = ""
 
     def can_play(self, pool: ResourcePool) -> bool:
         return pool.fear >= self.cost_fear and pool.belief >= self.cost_belief
 
     def pay_cost(self, pool: ResourcePool) -> bool:
         return pool.spend(fear=self.cost_fear, belief=self.cost_belief)
+
+    def asset_path(self) -> str:
+        """Return the filesystem path for this card's image asset."""
+
+        return self.image_path or f"assets/cards/{slugify(self.name)}.png"
 
 
 @dataclass
