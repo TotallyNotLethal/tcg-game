@@ -219,17 +219,18 @@ class GameState:
 
 
 def initial_game(deck_template: str = "balanced") -> GameState:
-    alice = PlayerState(name="Alice")
-    bob = PlayerState(name="Bob")
+    cpu = PlayerState(name="CPU")
+    human = PlayerState(name="You")
     # Seed players with starter territories
-    alice.territory_queue.extend(
+    cpu.territory_queue.extend(
         [belief_territory("Lighthouse Perch", 1), fear_territory("Shadowed Dock", 1), belief_territory("Foggy Causeway", 1)]
     )
-    bob.territory_queue.extend(
+    human.territory_queue.extend(
         [fear_territory("Forgotten Alley", 1), belief_territory("Candlelit Library", 1), fear_territory("Storm Drain", 1)]
     )
-    for player in (alice, bob):
+    for player in (cpu, human):
         player.deck.extend(starter_deck(deck_template))
         random.shuffle(player.deck)
         player.draw(3)
-    return GameState(players=(alice, bob))
+    # CPU is always index 0, human is index 1
+    return GameState(players=(cpu, human))

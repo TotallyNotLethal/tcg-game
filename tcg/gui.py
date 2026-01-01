@@ -22,7 +22,9 @@ class GameGUI:
         self.root = tk.Tk()
         self.root.title("Cryptid TCG Prototype")
         self.game: GameState = initial_game(deck_template)
-        self.active_index: int = 0
+        self.cpu_index: int = 0
+        self.human_index: int = 1
+        self.active_index: int = self.human_index
         self.drag_state: DragState = DragState()
         self.card_tags: Dict[tuple[int, str], Card] = {}
         self.selected_card: Optional[Card] = None
@@ -34,7 +36,7 @@ class GameGUI:
         control_frame = tk.Frame(self.root)
         control_frame.pack(side=tk.TOP, fill=tk.X)
 
-        self.active_label = tk.Label(control_frame, text="Active player: Alice", font=("Arial", 12, "bold"))
+        self.active_label = tk.Label(control_frame, text="Active player: You", font=("Arial", 12, "bold"))
         self.active_label.pack(side=tk.LEFT, padx=8, pady=4)
 
         tk.Button(control_frame, text="Draw Card", command=self.draw_card).pack(side=tk.LEFT, padx=4)
@@ -47,7 +49,7 @@ class GameGUI:
         board_frame = tk.Frame(self.root)
         board_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        # Opponent (index 1) on top, active player (index 0/1) on bottom for clarity
+        # CPU (index 0) on top, human (index 1) on bottom for clarity
         self.player_frames = []
         self.resource_labels = []
         self.influence_labels = []
@@ -87,6 +89,7 @@ class GameGUI:
         for idx in range(len(self.game.players)):
             self._render_player(idx)
         self._log(f"{self.game.players[self.active_index].name}'s turn begins.")
+        self._update_active_label()
 
     def _render_player(self, idx: int) -> None:
         player = self.game.players[idx]
@@ -94,7 +97,7 @@ class GameGUI:
         self.influence_labels[idx].configure(text=f"Influence: {player.influence}")
         self._render_battlefield(idx)
         self._render_hand(idx)
-        self.active_label.configure(text=f"Active player: {self.game.players[self.active_index].name}")
+        self._update_active_label()
 
     def _render_battlefield(self, idx: int) -> None:
         canvas = self.battlefield_canvases[idx]
@@ -134,12 +137,14 @@ class GameGUI:
             canvas.itemconfig(text_tag, font=("Arial", 9, "bold"))
 
     def _select_card(self, player_idx: int, tag: str) -> None:
+        if player_idx != self.human_index:
+            return
         self.selected_card = self.card_tags.get((player_idx, tag))
         if self.selected_card:
             self._log(f"Selected {self.selected_card.name} from {self.game.players[player_idx].name}'s hand.")
 
     def _start_drag(self, event: tk.Event, player_idx: int, tag: str) -> None:
-        if self.active_index != player_idx:
+        if self.active_index != player_idx or player_idx != self.human_index:
             return
         self.drag_state = DragState(player_index=player_idx, tag=tag, last_x=event.x, last_y=event.y)
         canvas = self.hand_canvases[player_idx]
@@ -170,17 +175,21 @@ class GameGUI:
         self.drag_state = DragState()
 
     def draw_card(self) -> None:
-        player = self.game.players[self.active_index]
+        if not self._assert_human_turn():
+            return
+        player = self.game.players[self.human_index]
         messages = player.draw()
         for msg in messages:
             self._log(msg)
-        self._render_player(self.active_index)
+        self._render_player(self.human_index)
 
     def play_selected(self) -> None:
         if not self.selected_card:
             self._log("No card selected.")
             return
-        self._play_card(self.active_index, self.selected_card)
+        if not self._assert_human_turn():
+            return
+        self._play_card(self.human_index, self.selected_card)
         self.selected_card = None
 
     def _play_card(self, player_idx: int, card: Card) -> None:
@@ -218,26 +227,30 @@ class GameGUI:
         self._render_player(player_idx)
 
     def play_queued_territory(self) -> None:
-        player = self.game.players[self.active_index]
+        if not self._assert_human_turn():
+            return
+        player = self.game.players[self.human_index]
         if not player.territory_queue:
             self._log("No queued territory to play.")
             return
         territory = player.territory_queue.pop(0)
         self._log(player.play_territory(territory, self.game.stack))
         self.resolve_stack()
-        self._render_player(self.active_index)
+        self._render_player(self.human_index)
 
     def pray(self) -> None:
-        player = self.game.players[self.active_index]
-        opponent = self.game.players[1 - self.active_index]
+        if not self._assert_human_turn():
+            return
+        player = self.game.players[self.human_index]
+        opponent = self.game.players[self.cpu_index]
         messages = player.pray_with_gods(opponent, self.game.stack)
         if not messages:
             self._log("No Gods to pray to.")
         for msg in messages:
             self._log(msg)
         self.resolve_stack()
-        self._render_player(self.active_index)
-        self._render_player(1 - self.active_index)
+        self._render_player(self.human_index)
+        self._render_player(self.cpu_index)
 
     def resolve_stack(self) -> None:
         for msg in self.game.stack.resolve_all():
@@ -246,10 +259,46 @@ class GameGUI:
         self._render_player(1)
 
     def end_turn(self) -> None:
-        self.active_index = 1 - self.active_index
-        self._log(f"It is now {self.game.players[self.active_index].name}'s turn.")
+        if not self._assert_human_turn():
+            return
+        self._log(f"{self.game.players[self.human_index].name} ends the turn.")
+        self.active_index = self.cpu_index
+        self._update_active_label()
         self._render_player(0)
         self._render_player(1)
+        self._run_cpu_turn()
+
+    def _run_cpu_turn(self) -> None:
+        cpu = self.game.players[self.cpu_index]
+        human = self.game.players[self.human_index]
+        self._log(f"{cpu.name}'s turn begins.")
+        for msg in cpu.draw():
+            self._log(msg)
+        if cpu.territory_queue:
+            territory = cpu.territory_queue.pop(0)
+            self._log(cpu.play_territory(territory, self.game.stack))
+        if cpu.hand:
+            self._log(cpu.play_first_affordable(self.game.stack))
+        self.resolve_stack()
+        prayers = cpu.pray_with_gods(human, self.game.stack)
+        for msg in prayers:
+            self._log(msg)
+        self.resolve_stack()
+        self._log(f"{cpu.name} ends the turn.")
+        self.active_index = self.human_index
+        self._update_active_label()
+        self._render_player(0)
+        self._render_player(1)
+        self._log(f"It is now {human.name}'s turn.")
+
+    def _assert_human_turn(self) -> bool:
+        if self.active_index != self.human_index:
+            self._log("It's not your turn.")
+            return False
+        return True
+
+    def _update_active_label(self) -> None:
+        self.active_label.configure(text=f"Active player: {self.game.players[self.active_index].name}")
 
     def _log(self, message: str) -> None:
         self.log_widget.configure(state=tk.NORMAL)
