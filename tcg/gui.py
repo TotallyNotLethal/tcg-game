@@ -231,8 +231,19 @@ class GameGUI:
             self.preview_window.attributes("-alpha", 0.9)
         except tk.TclError:
             pass
-        canvas = tk.Canvas(self.preview_window, width=140, height=110, bg="", highlightthickness=0)
-        canvas.pack()
+        canvas_bg = "white"
+        try:
+            canvas = tk.Canvas(
+                self.preview_window,
+                width=140,
+                height=110,
+                bg="systemTransparent",
+                highlightthickness=0,
+            )
+            canvas.pack()
+        except tk.TclError:
+            canvas = tk.Canvas(self.preview_window, width=140, height=110, bg=canvas_bg, highlightthickness=0)
+            canvas.pack()
         canvas.create_rectangle(5, 5, 135, 105, fill="#ffffff", outline="#6666aa", width=2)
         canvas.create_text(70, 20, text=card.name, font=("Arial", 10, "bold"))
         body_text = card.text
@@ -242,12 +253,14 @@ class GameGUI:
             body_text = card.prayer_text
         canvas.create_text(70, 65, text=body_text, width=120)
         self._move_drag_preview(self.root.winfo_pointerx(), self.root.winfo_pointery())
+        self.preview_window.lift()
 
     def _move_drag_preview(self, x_root: int, y_root: int) -> None:
         if not self.preview_window:
             return
         offset = 10
         self.preview_window.geometry(f"+{x_root + offset}+{y_root + offset}")
+        self.preview_window.lift()
 
     def _destroy_drag_preview(self) -> None:
         if self.preview_window:
@@ -323,6 +336,7 @@ class GameGUI:
         canvas.tag_raise(tag)
         self._create_drag_preview(self.card_tags.get((player_idx, tag)))
         self._refresh_drop_zone_bounds()
+        self.root.bind("<B1-Motion>", self._on_global_drag_motion)
 
     def _drag(self, event: tk.Event, player_idx: int, tag: str) -> None:
         if self.drag_state.tag != tag or self.drag_state.player_index != player_idx:
@@ -349,6 +363,13 @@ class GameGUI:
         self._destroy_drag_preview()
         self._render_hand(player_idx)
         self.drag_state = DragState()
+        self.root.unbind("<B1-Motion>")
+
+    def _on_global_drag_motion(self, event: tk.Event) -> None:
+        if not self.drag_state.tag:
+            return
+        self._move_drag_preview(event.x_root, event.y_root)
+        self._update_hover_target(event.x_root, event.y_root)
 
     def draw_card(self) -> None:
         if not self._assert_human_turn():
