@@ -1,0 +1,266 @@
+"""Tkinter GUI for a lightweight hands-on card demo."""
+from __future__ import annotations
+
+import tkinter as tk
+from dataclasses import dataclass
+from typing import Dict, Optional
+
+from .cards import Card, Cryptid, EventCard, GodCard, TerritoryCard
+from .game import GameState, initial_game
+
+
+@dataclass
+class DragState:
+    player_index: Optional[int] = None
+    tag: Optional[str] = None
+    last_x: int = 0
+    last_y: int = 0
+
+
+class GameGUI:
+    def __init__(self, deck_template: str = "balanced") -> None:
+        self.root = tk.Tk()
+        self.root.title("Cryptid TCG Prototype")
+        self.game: GameState = initial_game(deck_template)
+        self.active_index: int = 0
+        self.drag_state: DragState = DragState()
+        self.card_tags: Dict[tuple[int, str], Card] = {}
+        self.selected_card: Optional[Card] = None
+
+        self._build_layout()
+        self._render_all()
+
+    def _build_layout(self) -> None:
+        control_frame = tk.Frame(self.root)
+        control_frame.pack(side=tk.TOP, fill=tk.X)
+
+        self.active_label = tk.Label(control_frame, text="Active player: Alice", font=("Arial", 12, "bold"))
+        self.active_label.pack(side=tk.LEFT, padx=8, pady=4)
+
+        tk.Button(control_frame, text="Draw Card", command=self.draw_card).pack(side=tk.LEFT, padx=4)
+        tk.Button(control_frame, text="Play Selected", command=self.play_selected).pack(side=tk.LEFT, padx=4)
+        tk.Button(control_frame, text="Play Queued Territory", command=self.play_queued_territory).pack(side=tk.LEFT, padx=4)
+        tk.Button(control_frame, text="Pray with Gods", command=self.pray).pack(side=tk.LEFT, padx=4)
+        tk.Button(control_frame, text="Resolve Stack", command=self.resolve_stack).pack(side=tk.LEFT, padx=4)
+        tk.Button(control_frame, text="End Turn", command=self.end_turn).pack(side=tk.LEFT, padx=4)
+
+        board_frame = tk.Frame(self.root)
+        board_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        # Opponent (index 1) on top, active player (index 0/1) on bottom for clarity
+        self.player_frames = []
+        self.resource_labels = []
+        self.influence_labels = []
+        self.battlefield_canvases = []
+        self.hand_canvases = []
+
+        for idx, player in enumerate(self.game.players):
+            frame = tk.LabelFrame(board_frame, text=player.name)
+            frame.pack(side=tk.TOP, fill=tk.X, padx=8, pady=6)
+            self.player_frames.append(frame)
+
+            info_frame = tk.Frame(frame)
+            info_frame.pack(side=tk.TOP, fill=tk.X)
+            resource_lbl = tk.Label(info_frame, text="Resources")
+            resource_lbl.pack(side=tk.LEFT, padx=4)
+            self.resource_labels.append(resource_lbl)
+
+            influence_lbl = tk.Label(info_frame, text="Influence: 20")
+            influence_lbl.pack(side=tk.LEFT, padx=4)
+            self.influence_labels.append(influence_lbl)
+
+            battlefield = tk.Canvas(frame, height=140, bg="#f3f3f3")
+            battlefield.pack(side=tk.TOP, fill=tk.X, padx=4, pady=4)
+            self.battlefield_canvases.append(battlefield)
+
+            hand = tk.Canvas(frame, height=120, bg="#e8e8ff")
+            hand.pack(side=tk.TOP, fill=tk.X, padx=4, pady=4)
+            self.hand_canvases.append(hand)
+
+        log_frame = tk.Frame(self.root)
+        log_frame.pack(side=tk.BOTTOM, fill=tk.BOTH)
+        tk.Label(log_frame, text="Action Log").pack(anchor="w")
+        self.log_widget = tk.Text(log_frame, height=12, state=tk.DISABLED)
+        self.log_widget.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+
+    def _render_all(self) -> None:
+        for idx in range(len(self.game.players)):
+            self._render_player(idx)
+        self._log(f"{self.game.players[self.active_index].name}'s turn begins.")
+
+    def _render_player(self, idx: int) -> None:
+        player = self.game.players[idx]
+        self.resource_labels[idx].configure(text=player.resources.describe())
+        self.influence_labels[idx].configure(text=f"Influence: {player.influence}")
+        self._render_battlefield(idx)
+        self._render_hand(idx)
+        self.active_label.configure(text=f"Active player: {self.game.players[self.active_index].name}")
+
+    def _render_battlefield(self, idx: int) -> None:
+        canvas = self.battlefield_canvases[idx]
+        canvas.delete("all")
+        player = self.game.players[idx]
+        for i, card in enumerate(player.battlefield):
+            x = 10 + i * 130
+            y = 10
+            rect = canvas.create_rectangle(x, y, x + 120, y + 110, fill="#d9f7d9", outline="#4a7b4a")
+            canvas.create_text(x + 60, y + 15, text=card.name, font=("Arial", 10, "bold"))
+            canvas.create_text(x + 60, y + 40, text=card.text[:40] + ("..." if len(card.text) > 40 else ""), width=110)
+            if isinstance(card, Cryptid):
+                canvas.create_text(x + 60, y + 70, text=card.stats.describe(), fill="#1f4b99")
+                canvas.create_text(x + 60, y + 95, text=f"Current HP: {card.current_health}", fill="#b03060")
+            elif isinstance(card, GodCard):
+                canvas.create_text(x + 60, y + 80, text=card.prayer_text or card.text, width=110)
+            else:
+                canvas.create_text(x + 60, y + 80, text=card.text, width=110)
+            canvas.itemconfigure(rect, tags=(f"bf_{idx}_{i}",))
+
+    def _render_hand(self, idx: int) -> None:
+        canvas = self.hand_canvases[idx]
+        canvas.delete("all")
+        player = self.game.players[idx]
+        self.card_tags = {key: value for key, value in self.card_tags.items() if key[0] != idx}
+        for i, card in enumerate(player.hand):
+            x = 10 + i * 130
+            y = 10
+            tag = f"hand_{idx}_{i}"
+            rect = canvas.create_rectangle(x, y, x + 120, y + 100, fill="#ffffff", outline="#6666aa", tags=(tag,))
+            text_tag = canvas.create_text(x + 60, y + 50, text=card.name, width=110, tags=(tag,))
+            self.card_tags[(idx, tag)] = card
+            canvas.tag_bind(tag, "<Button-1>", lambda e, t=tag, p=idx: self._select_card(p, t))
+            canvas.tag_bind(tag, "<ButtonPress-1>", lambda e, t=tag, p=idx: self._start_drag(e, p, t))
+            canvas.tag_bind(tag, "<B1-Motion>", lambda e, t=tag, p=idx: self._drag(e, p, t))
+            canvas.tag_bind(tag, "<ButtonRelease-1>", lambda e, t=tag, p=idx: self._end_drag(e, p, t))
+            canvas.itemconfig(text_tag, font=("Arial", 9, "bold"))
+
+    def _select_card(self, player_idx: int, tag: str) -> None:
+        self.selected_card = self.card_tags.get((player_idx, tag))
+        if self.selected_card:
+            self._log(f"Selected {self.selected_card.name} from {self.game.players[player_idx].name}'s hand.")
+
+    def _start_drag(self, event: tk.Event, player_idx: int, tag: str) -> None:
+        if self.active_index != player_idx:
+            return
+        self.drag_state = DragState(player_index=player_idx, tag=tag, last_x=event.x, last_y=event.y)
+        canvas = self.hand_canvases[player_idx]
+        canvas.tag_raise(tag)
+
+    def _drag(self, event: tk.Event, player_idx: int, tag: str) -> None:
+        if self.drag_state.tag != tag or self.drag_state.player_index != player_idx:
+            return
+        canvas = self.hand_canvases[player_idx]
+        dx = event.x - self.drag_state.last_x
+        dy = event.y - self.drag_state.last_y
+        canvas.move(tag, dx, dy)
+        self.drag_state.last_x = event.x
+        self.drag_state.last_y = event.y
+
+    def _end_drag(self, event: tk.Event, player_idx: int, tag: str) -> None:
+        if self.drag_state.tag != tag or self.drag_state.player_index != player_idx:
+            return
+        card = self.card_tags.get((player_idx, tag))
+        if not card:
+            return
+        battlefield = self.battlefield_canvases[player_idx]
+        bx, by = battlefield.winfo_rootx(), battlefield.winfo_rooty()
+        bw, bh = battlefield.winfo_width(), battlefield.winfo_height()
+        if bx <= event.x_root <= bx + bw and by <= event.y_root <= by + bh:
+            self._play_card(player_idx, card)
+        self._render_hand(player_idx)
+        self.drag_state = DragState()
+
+    def draw_card(self) -> None:
+        player = self.game.players[self.active_index]
+        messages = player.draw()
+        for msg in messages:
+            self._log(msg)
+        self._render_player(self.active_index)
+
+    def play_selected(self) -> None:
+        if not self.selected_card:
+            self._log("No card selected.")
+            return
+        self._play_card(self.active_index, self.selected_card)
+        self.selected_card = None
+
+    def _play_card(self, player_idx: int, card: Card) -> None:
+        player = self.game.players[player_idx]
+        if card not in player.hand:
+            self._log("Card is no longer in hand.")
+            return
+
+        message: Optional[str] = None
+        if isinstance(card, TerritoryCard):
+            player.hand.remove(card)
+            message = player.settle_territory_card(card, self.game.stack)
+        elif isinstance(card, Cryptid):
+            if not card.can_play(player.resources):
+                self._log(f"Cannot afford {card.name}.")
+                return
+            player.hand.remove(card)
+            message = player.summon(card, self.game.stack)
+        elif isinstance(card, EventCard):
+            if not card.can_play(player.resources):
+                self._log(f"Cannot afford {card.name}.")
+                return
+            player.hand.remove(card)
+            message = player.cast_event(card, self.game.stack)
+        elif isinstance(card, GodCard):
+            if not card.can_play(player.resources):
+                self._log(f"Cannot afford {card.name}.")
+                return
+            player.hand.remove(card)
+            message = player.play_god(card, self.game.stack)
+
+        if message:
+            self._log(message)
+        self.resolve_stack()
+        self._render_player(player_idx)
+
+    def play_queued_territory(self) -> None:
+        player = self.game.players[self.active_index]
+        if not player.territory_queue:
+            self._log("No queued territory to play.")
+            return
+        territory = player.territory_queue.pop(0)
+        self._log(player.play_territory(territory, self.game.stack))
+        self.resolve_stack()
+        self._render_player(self.active_index)
+
+    def pray(self) -> None:
+        player = self.game.players[self.active_index]
+        opponent = self.game.players[1 - self.active_index]
+        messages = player.pray_with_gods(opponent, self.game.stack)
+        if not messages:
+            self._log("No Gods to pray to.")
+        for msg in messages:
+            self._log(msg)
+        self.resolve_stack()
+        self._render_player(self.active_index)
+        self._render_player(1 - self.active_index)
+
+    def resolve_stack(self) -> None:
+        for msg in self.game.stack.resolve_all():
+            self._log(msg)
+        self._render_player(0)
+        self._render_player(1)
+
+    def end_turn(self) -> None:
+        self.active_index = 1 - self.active_index
+        self._log(f"It is now {self.game.players[self.active_index].name}'s turn.")
+        self._render_player(0)
+        self._render_player(1)
+
+    def _log(self, message: str) -> None:
+        self.log_widget.configure(state=tk.NORMAL)
+        self.log_widget.insert(tk.END, message + "\n")
+        self.log_widget.see(tk.END)
+        self.log_widget.configure(state=tk.DISABLED)
+
+    def run(self) -> None:
+        self.root.mainloop()
+
+
+if __name__ == "__main__":
+    gui = GameGUI()
+    gui.run()
