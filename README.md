@@ -10,6 +10,8 @@ A lightweight console simulator exercises the phase loop, dual resources, exempl
 
 ```bash
 python console_sim.py
+# or play until a winner is found
+python console_sim.py --until-win --max-turns 25
 ```
 
 This seeds two players (Alice and Bob) with shuffled starter decks, a small opening hand, and queued territories, then runs scripted turns to showcase:

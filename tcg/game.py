@@ -106,6 +106,8 @@ class GameState:
     stack: GameStack = field(default_factory=GameStack)
     phases: PhaseLoop = field(default_factory=PhaseLoop.default)
     turn: int = 1
+    winner: Optional[PlayerState] = None
+    game_over_reason: Optional[str] = None
 
     def step(self) -> List[str]:
         """Advance through one turn worth of phases with lightweight scripting."""
@@ -122,8 +124,23 @@ class GameState:
             elif phase == Phase.END:
                 log.append(f"{active.name} ends the turn.")
         log.extend(self.stack.resolve_all())
+        self._check_winner(log)
         self.turn += 1
         return log
+
+    def play_until_over(self, max_turns: int = 30) -> List[str]:
+        """Drive turns until a winner is found or a turn limit is reached."""
+
+        full_log: List[str] = []
+        while not self.winner and self.turn <= max_turns:
+            full_log.extend(self.step())
+        if not self.winner and self.turn > max_turns:
+            self.game_over_reason = self.game_over_reason or f"Reached turn limit {max_turns}."
+        if self.winner:
+            full_log.append(f"{self.winner.name} wins! {self.game_over_reason or ''}".strip())
+        elif self.game_over_reason:
+            full_log.append(self.game_over_reason)
+        return full_log
 
     def _run_main_phase(self, player: PlayerState, opponent: PlayerState) -> List[str]:
         log: List[str] = []
@@ -176,6 +193,29 @@ class GameState:
                 pool.spend(fear=mv.cost_fear, belief=mv.cost_belief)
                 return mv
         return None
+
+    def _check_winner(self, log: List[str]) -> None:
+        """Set the winner if a player hits zero influence or runs out of resources."""
+
+        defeated: Optional[PlayerState] = None
+        # Influence defeat
+        for player in self.players:
+            if player.influence <= 0:
+                defeated = player
+                self.game_over_reason = f"{player.name} is out of influence."
+                break
+
+        # Deck-out defeat if someone attempts to draw with an empty deck and an empty hand
+        if not defeated:
+            for player in self.players:
+                if not player.deck and not player.hand and not any(isinstance(c, Cryptid) for c in player.battlefield):
+                    defeated = player
+                    self.game_over_reason = f"{player.name} is out of cards and creatures."
+                    break
+
+        if defeated:
+            self.winner = self.players[0] if defeated is self.players[1] else self.players[1]
+            log.append(self.game_over_reason)
 
 
 def initial_game(deck_template: str = "balanced") -> GameState:
