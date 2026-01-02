@@ -42,7 +42,14 @@ def build_prompt(card: Card) -> str:
     return " ".join(parts)
 
 
-def generate_image(card: Card, output_dir: Path, client: OpenAI, overwrite: bool = False) -> Path:
+def generate_image(
+    card: Card,
+    output_dir: Path,
+    client: OpenAI,
+    *,
+    overwrite: bool = False,
+    size: str = "1024x1024",
+) -> Path:
     """Call ChatGPT image generation for a card and persist it to disk."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -53,7 +60,7 @@ def generate_image(card: Card, output_dir: Path, client: OpenAI, overwrite: bool
         return output_path
 
     prompt = build_prompt(card)
-    response = client.images.generate(model="gpt-image-1", prompt=prompt, size="512x512")
+    response = client.images.generate(model="gpt-image-1", prompt=prompt, size=size)
     image_b64 = response.data[0].b64_json
     output_path.write_bytes(base64.b64decode(image_b64))
     print(f"Saved {card.name} -> {output_path}")
@@ -73,11 +80,17 @@ def main() -> None:
         action="store_true",
         help="Recreate images even if a file already exists",
     )
+    parser.add_argument(
+        "--size",
+        default="1024x1024",
+        choices=["1024x1024", "1024x1536", "1536x1024", "auto"],
+        help="Image size to request from the API (default: 1024x1024)",
+    )
     args = parser.parse_args()
 
     client = OpenAI()
     for card in iter_unique_cards():
-        generate_image(card, args.output_dir, client, overwrite=args.overwrite)
+        generate_image(card, args.output_dir, client, overwrite=args.overwrite, size=args.size)
 
 
 if __name__ == "__main__":
