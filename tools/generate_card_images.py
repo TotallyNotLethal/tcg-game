@@ -49,7 +49,7 @@ def generate_image(
     *,
     overwrite: bool = False,
     size: str = "1024x1024",
-    model: str = "gpt-image-1",
+    model: str = "dall-e-3",
 ) -> Path:
     """Call ChatGPT image generation for a card and persist it to disk."""
 
@@ -101,7 +101,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        default="gpt-image-1",
+        default="dall-e-3",
         help=(
             "Image generation model to use (e.g., gpt-image-1 or dall-e-3). "
             "Use a model available to your account."
