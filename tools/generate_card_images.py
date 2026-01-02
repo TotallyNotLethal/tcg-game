@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Iterable, Set
 
-from openai import OpenAI
+from openai import APIStatusError, OpenAI, PermissionDeniedError
 
 # Ensure the project root is on the import path when executed as a script
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -49,6 +49,7 @@ def generate_image(
     *,
     overwrite: bool = False,
     size: str = "1024x1024",
+    model: str = "gpt-image-1",
 ) -> Path:
     """Call ChatGPT image generation for a card and persist it to disk."""
 
@@ -60,7 +61,19 @@ def generate_image(
         return output_path
 
     prompt = build_prompt(card)
-    response = client.images.generate(model="gpt-image-1", prompt=prompt, size=size)
+    try:
+        response = client.images.generate(model=model, prompt=prompt, size=size)
+    except PermissionDeniedError as exc:  # pragma: no cover - API behavior
+        message = (
+            "Image generation failed with a permission error. The selected model "
+            f"'{model}' may require organization verification or access. Try choosing "
+            "a model available to your account (e.g., 'dall-e-3') or verify your "
+            "organization at https://platform.openai.com/settings/organization/general."
+        )
+        raise SystemExit(message) from exc
+    except APIStatusError as exc:  # pragma: no cover - API behavior
+        raise SystemExit(f"Image generation failed: {exc.message}") from exc
+
     image_b64 = response.data[0].b64_json
     output_path.write_bytes(base64.b64decode(image_b64))
     print(f"Saved {card.name} -> {output_path}")
@@ -86,11 +99,26 @@ def main() -> None:
         choices=["1024x1024", "1024x1536", "1536x1024", "auto"],
         help="Image size to request from the API (default: 1024x1024)",
     )
+    parser.add_argument(
+        "--model",
+        default="gpt-image-1",
+        help=(
+            "Image generation model to use (e.g., gpt-image-1 or dall-e-3). "
+            "Use a model available to your account."
+        ),
+    )
     args = parser.parse_args()
 
     client = OpenAI()
     for card in iter_unique_cards():
-        generate_image(card, args.output_dir, client, overwrite=args.overwrite, size=args.size)
+        generate_image(
+            card,
+            args.output_dir,
+            client,
+            overwrite=args.overwrite,
+            size=args.size,
+            model=args.model,
+        )
 
 
 if __name__ == "__main__":
