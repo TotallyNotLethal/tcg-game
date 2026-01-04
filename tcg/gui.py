@@ -69,6 +69,9 @@ class GameGUI:
         self.drop_zone_gradient_items: Dict[int, list[int]] = {}
         self.drop_zone_glow_items: Dict[int, list[int]] = {}
         self.drop_zone_tooltips: Dict[int, tuple[int, int]] = {}
+        self.drop_zone_slot_items: Dict[int, list[int]] = {}
+        self.drop_zone_background_items: Dict[int, int] = {}
+        self._playmat_image_cache: Dict[Tuple[str, int, int], tk.PhotoImage] = {}
         self._image_cache: Dict[Tuple[str, int, int], tk.PhotoImage] = {}
         self._font_cache: Dict[Tuple[str, int, str], tkfont.Font] = {}
         self._hovered_hand_tag: Optional[str] = None
@@ -583,22 +586,29 @@ class GameGUI:
     def _draw_drop_zone(self, idx: int, layout: dict[str, object]) -> None:
         canvas = self.battlefield_canvases[idx]
         canvas.update_idletasks()
-        active_and_bench = [layout["active"], *layout["bench"]]
-        x1 = min(slot[0] for slot in active_and_bench) - 10
-        y1 = min(slot[1] for slot in active_and_bench) - 10
-        x2 = max(slot[2] for slot in active_and_bench) + 10
-        y2 = max(slot[3] for slot in active_and_bench) + 10
+        frame_slots = [layout["active"], *layout["bench"], *layout["territories"]]
+        x1 = min(slot[0] for slot in frame_slots) - 18
+        y1 = min(slot[1] for slot in frame_slots) - 18
+        x2 = max(slot[2] for slot in frame_slots) + 18
+        y2 = max(slot[3] for slot in frame_slots) + 18
         rect_tag = f"drop_zone_{idx}_rect"
         label_tag = f"drop_zone_{idx}_label"
         self._clear_drop_zone_gradient(idx)
         self._clear_drop_zone_tooltip(idx)
+        self._clear_drop_zone_slots(idx)
         if idx in self.drop_zone_items:
             rect_id, label_id = self.drop_zone_items[idx]
             canvas.delete(rect_id)
             canvas.delete(label_id)
-        gradient_items = self._create_vertical_gradient(
-            canvas, x1, y1, x2, y2, start=self.TABLE_COLOR, end=self.SURFACE_COLOR, steps=14
-        )
+
+        playmat_image = self._get_playmat_image(int(x2 - x1), int(y2 - y1))
+        if playmat_image:
+            bg_id = canvas.create_image(x1, y1, anchor="nw", image=playmat_image)
+            self.drop_zone_background_items[idx] = bg_id
+            self.drop_zone_slot_items[idx] = [bg_id]
+        else:
+            self.drop_zone_slot_items[idx] = []
+
         rect_id = canvas.create_rectangle(
             x1 + 2,
             y1 + 2,
@@ -607,18 +617,86 @@ class GameGUI:
             dash=(),
             outline=self.ACCENT_COLOR,
             width=2,
-            fill="",
+            fill=self._blend_color(self.TABLE_COLOR, "#000000", 0.35),
+            stipple="gray50",
             tags=(rect_tag,),
         )
+
+        slot_items: list[int] = []
+
+        def add_slot_overlay(
+            coords: tuple[float, float, float, float],
+            label: str,
+            fill: str,
+            outline: str,
+            tag: str,
+        ) -> None:
+            x_a, y_a, x_b, y_b = coords
+            rect = canvas.create_rectangle(
+                x_a,
+                y_a,
+                x_b,
+                y_b,
+                fill=fill,
+                outline=outline,
+                width=2,
+                dash=(4, 2),
+                stipple="gray50",
+                tags=(tag,),
+            )
+            text = canvas.create_text(
+                (x_a + x_b) / 2,
+                y_a + 14,
+                text=label,
+                fill=self.TEXT_COLOR,
+                font=("Arial", 10, "bold"),
+                tags=(tag,),
+            )
+            slot_items.extend([rect, text])
+            hover_fill = self._blend_color(fill, "#ffffff", 0.18)
+            canvas.tag_bind(tag, "<Enter>", lambda _e, r=rect, f=hover_fill: canvas.itemconfigure(r, fill=f))
+            canvas.tag_bind(tag, "<Leave>", lambda _e, r=rect, f=fill: canvas.itemconfigure(r, fill=f))
+
+        territory_band = (
+            min(slot[0] for slot in layout["territories"]) - 6,
+            min(slot[1] for slot in layout["territories"]) - 6,
+            max(slot[2] for slot in layout["territories"]) + 6,
+            max(slot[3] for slot in layout["territories"]) + 6,
+        )
+        add_slot_overlay(
+            territory_band,
+            "Territory / Land Row",
+            self._blend_color(self.FIELD_GLOW, "#000000", 0.45),
+            self.FIELD_GLOW,
+            f"drop_zone_{idx}_territory",
+        )
+
+        add_slot_overlay(
+            layout["active"],
+            "Active Summon", 
+            self._blend_color(self.SECONDARY_ACCENT, "#000000", 0.55),
+            self.SECONDARY_ACCENT,
+            f"drop_zone_{idx}_active",
+        )
+
+        for bench_idx, bench_slot in enumerate(layout["bench"], start=1):
+            add_slot_overlay(
+                bench_slot,
+                f"Bench {bench_idx} (Ally)",
+                self._blend_color(self.ACCENT_COLOR, "#000000", 0.65),
+                self.ACCENT_COLOR,
+                f"drop_zone_{idx}_bench_{bench_idx}",
+            )
+
         label_id = canvas.create_text(
             (x1 + x2) / 2,
-            y1 + 18,
-            text="Enchanted field — drop to deploy",
+            y1 + 16,
+            text="Ritual playmat — drop cards onto matching zones",
             font=("Arial", 11, "bold"),
             fill=self.TEXT_COLOR,
             tags=(label_tag,),
         )
-        self.drop_zone_gradient_items[idx] = gradient_items
+        self.drop_zone_slot_items[idx].extend(slot_items)
         self.drop_zone_glow_items[idx] = []
         self.drop_zone_boxes[idx] = (x1, y1, x2, y2)
         self.drop_zone_items[idx] = (rect_id, label_id)
@@ -638,6 +716,15 @@ class GameGUI:
         canvas = self.battlefield_canvases[idx]
         for item_id in ids:
             canvas.delete(item_id)
+
+    def _clear_drop_zone_slots(self, idx: int) -> None:
+        canvas = self.battlefield_canvases[idx]
+        for item_id in self.drop_zone_slot_items.get(idx, []):
+            canvas.delete(item_id)
+        self.drop_zone_slot_items[idx] = []
+        if idx in self.drop_zone_background_items:
+            canvas.delete(self.drop_zone_background_items[idx])
+            self.drop_zone_background_items.pop(idx, None)
 
     def _show_drop_tooltip(self, idx: int, text: str, color: str | None = None) -> None:
         if idx not in self.drop_zone_boxes:
@@ -699,6 +786,31 @@ class GameGUI:
             rect = canvas.create_rectangle(x1, y1 + (height / steps) * i, x2, y1 + (height / steps) * (i + 1), outline="", fill=color)
             items.append(rect)
         return items
+
+    def _get_playmat_image(self, max_width: int, max_height: int) -> Optional[tk.PhotoImage]:
+        path = Path("assets/board/playmat_portal.png")
+        if not path.exists():
+            return None
+
+        cache_key = (str(path), max_width, max_height)
+        if cache_key in self._playmat_image_cache:
+            return self._playmat_image_cache[cache_key]
+
+        try:
+            image = Image.open(path).convert("RGBA")
+        except (OSError, FileNotFoundError):
+            return None
+
+        width, height = image.size
+        target_w = max(max_width, 1)
+        target_h = max(max_height, 1)
+        scale = max(target_w / width, target_h / height)
+        new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
+        resized = image.resize(new_size, Image.LANCZOS)
+        cropped = resized.crop((0, 0, target_w, target_h))
+        tk_img = ImageTk.PhotoImage(cropped)
+        self._playmat_image_cache[cache_key] = tk_img
+        return tk_img
 
     def _apply_drop_zone_glow(self, idx: int, base_color: str) -> None:
         if idx not in self.drop_zone_boxes:
