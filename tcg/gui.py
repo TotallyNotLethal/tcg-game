@@ -212,7 +212,7 @@ class GameGUI:
 
             hand = tk.Canvas(
                 frame,
-                height=150,
+                height=230,
                 bg=self.HAND_COLOR,
                 highlightthickness=1,
                 highlightbackground=self.BORDER_COLOR,
