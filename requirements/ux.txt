@@ -1,0 +1,4 @@
+Pillow>=9.0
+# Optional themed Tkinter widgets; uncomment if using
+# ttkbootstrap
+# customtkinter
