@@ -33,7 +33,10 @@ class GameGUI:
         self.selected_card: Optional[Card] = None
         self.selected_player_idx: Optional[int] = None
         self.selected_tag: Optional[str] = None
-        self.preview_window: Optional[tk.Toplevel] = None
+        self.drag_overlay: Optional[tk.Toplevel] = None
+        self.drag_overlay_canvas: Optional[tk.Canvas] = None
+        self.drag_overlay_bounds: Optional[tuple[int, int, int, int]] = None
+        self.drag_overlay_card: Optional[Card] = None
         self.detail_window: Optional[tk.Toplevel] = None
         self.drop_zone_boxes: Dict[int, tuple[int, int, int, int]] = {}
         self.drop_zone_items: Dict[int, tuple[int, int]] = {}
@@ -233,55 +236,153 @@ class GameGUI:
         if not card:
             return
         self._destroy_drag_preview()
-        self.preview_window = tk.Toplevel(self.root)
-        self.preview_window.overrideredirect(True)
-        self.preview_window.attributes("-topmost", True)
+        self.drag_overlay_card = card
+        self.root.update_idletasks()
+        root_w = max(self.root.winfo_width(), 1)
+        root_h = max(self.root.winfo_height(), 1)
+        root_x, root_y = self.root.winfo_rootx(), self.root.winfo_rooty()
+        self.drag_overlay = tk.Toplevel(self.root)
+        self.drag_overlay.overrideredirect(True)
+        self.drag_overlay.attributes("-topmost", True)
         try:
-            self.preview_window.attributes("-alpha", 0.9)
+            self.drag_overlay.attributes("-alpha", 0.9)
         except tk.TclError:
             pass
-        canvas_bg = "white"
+        try:
+            self.drag_overlay.attributes("-transparentcolor", "systemTransparent")
+            bg_color = "systemTransparent"
+        except tk.TclError:
+            bg_color = ""
+        self.drag_overlay.configure(bg=bg_color)
+        self.drag_overlay.geometry(f"{root_w}x{root_h}+{root_x}+{root_y}")
         try:
             canvas = tk.Canvas(
-                self.preview_window,
-                width=140,
-                height=110,
-                bg="systemTransparent",
+                self.drag_overlay,
+                width=root_w,
+                height=root_h,
+                bg=bg_color or "white",
                 highlightthickness=0,
             )
-            canvas.pack()
         except tk.TclError:
-            canvas = tk.Canvas(self.preview_window, width=140, height=110, bg=canvas_bg, highlightthickness=0)
-            canvas.pack()
-        canvas.create_rectangle(5, 5, 135, 105, fill="#ffffff", outline="#6666aa", width=2)
-        canvas.create_text(70, 20, text=card.name, font=("Arial", 10, "bold"))
-        body_text = card.text
-        if isinstance(card, Cryptid):
-            body_text = f"{card.stats.describe()}\nHP: {card.current_health}\n{card.text}"
-        elif isinstance(card, GodCard) and card.prayer_text:
-            body_text = card.prayer_text
-        canvas.create_text(70, 65, text=body_text, width=120)
+            canvas = tk.Canvas(self.drag_overlay, width=root_w, height=root_h, bg="white", highlightthickness=0)
+        canvas.pack(fill=tk.BOTH, expand=True)
+        self.drag_overlay_canvas = canvas
+        self.drag_overlay.lift()
+        self.drag_overlay.bind("<B1-Motion>", self._on_global_drag_motion)
+        self.drag_overlay.bind("<ButtonRelease-1>", self._on_global_button_release)
         self._move_drag_preview(self.root.winfo_pointerx(), self.root.winfo_pointery())
-        self.preview_window.lift()
 
     def _move_drag_preview(self, x_root: int, y_root: int) -> None:
-        if not self.preview_window:
+        if not self.drag_overlay or not self.drag_overlay_canvas or not self.drag_overlay_card:
             return
-        offset = 10
-        self.preview_window.geometry(f"+{x_root + offset}+{y_root + offset}")
-        self.preview_window.lift()
+        self.root.update_idletasks()
+        root_w = max(self.root.winfo_width(), 1)
+        root_h = max(self.root.winfo_height(), 1)
+        root_x, root_y = self.root.winfo_rootx(), self.root.winfo_rooty()
+        self.drag_overlay.geometry(f"{root_w}x{root_h}+{root_x}+{root_y}")
+        self.drag_overlay.lift()
+        canvas = self.drag_overlay_canvas
+        canvas.configure(width=root_w, height=root_h)
+        canvas.delete("all")
+
+        card_w = 170
+        card_h = 220
+        local_x = x_root - self.drag_overlay.winfo_rootx()
+        local_y = y_root - self.drag_overlay.winfo_rooty()
+        x1 = local_x - card_w / 2
+        y1 = local_y - card_h / 2
+        x2 = x1 + card_w
+        y2 = y1 + card_h
+
+        header_font = self._get_font("Arial", 10, "bold")
+        body_font = self._get_font("Arial", 9)
+        tiny_font = self._get_font("Arial", 8, "bold")
+
+        canvas.create_rectangle(x1 + 6, y1 + 10, x2 + 6, y2 + 10, fill="#c4c8d4", outline="")
+        canvas.create_rectangle(x1, y1, x2, y2, fill="#f9fbff", outline="#6666aa", width=2)
+        canvas.create_rectangle(x1 + 6, y1 + 6, x2 - 6, y2 - 6, fill="#ffffff", outline="#a2a8c5", width=1)
+        canvas.create_rectangle(x1 + 6, y1 + 6, x2 - 6, y1 + 36, fill="#e7ecff", outline="",)
+        canvas.create_text(x1 + 12, y1 + 22, text=self.drag_overlay_card.name, anchor="w", font=header_font)
+
+        cost_x = x2 - 10
+        if self.drag_overlay_card.cost_belief:
+            canvas.create_oval(cost_x - 20, y1 + 10, cost_x - 6, y1 + 24, fill="#ffe8b3", outline="#c08000", width=1)
+            canvas.create_text(cost_x - 13, y1 + 17, text=str(self.drag_overlay_card.cost_belief), font=tiny_font, fill="#7a4a00")
+        if self.drag_overlay_card.cost_fear:
+            canvas.create_oval(cost_x - 20, y1 + 10, cost_x - 6, y1 + 24, fill="#c9b7f7", outline="#6540c2", width=1)
+            canvas.create_text(cost_x - 13, y1 + 17, text=str(self.drag_overlay_card.cost_fear), font=tiny_font, fill="#3a1b6f")
+
+        image = self._get_card_image(self.drag_overlay_card, 110, 80)
+        image_top = y1 + 44
+        image_height = 80
+        if image:
+            canvas.create_rectangle(x1 + 10, image_top, x2 - 10, image_top + image_height, fill="#eef1ff", outline="#d0d4ee")
+            canvas.create_image((x1 + x2) / 2, image_top + image_height / 2, image=image)
+
+        body_top = image_top + image_height + 6
+        text_block_height = 52
+        body_text = (self.drag_overlay_card.text or "")[:160]
+        canvas.create_text(
+            x1 + 12,
+            body_top,
+            anchor="nw",
+            text=body_text + ("..." if len(self.drag_overlay_card.text or "") > 160 else ""),
+            width=card_w - 24,
+            font=body_font,
+        )
+
+        stats_top = body_top + text_block_height
+        if isinstance(self.drag_overlay_card, Cryptid):
+            stats = self.drag_overlay_card.stats
+            stat_box_height = 28
+            canvas.create_rectangle(x1 + 10, stats_top, x2 - 10, stats_top + stat_box_height, fill="#eef7ff", outline="#c3d8ff")
+            canvas.create_text(
+                (x1 + x2) / 2,
+                stats_top + stat_box_height / 2,
+                text=f"PWR {stats.power}  DEF {stats.defense}  HP {self.drag_overlay_card.current_health}/{stats.health}",
+                font=self._get_font("Arial", 9, "bold"),
+            )
+            move_top = stats_top + stat_box_height + 4
+            moves_to_show = self.drag_overlay_card.moves[:2]
+            for move in moves_to_show:
+                canvas.create_text(
+                    x1 + 12,
+                    move_top,
+                    anchor="nw",
+                    text=move.describe(),
+                    width=card_w - 24,
+                    font=self._get_font("Arial", 8),
+                )
+                move_top += 18
+        else:
+            canvas.create_rectangle(x1 + 10, stats_top, x2 - 10, stats_top + 28, fill="#f9f1ea", outline="#e2c7a6")
+            canvas.create_text(x1 + 12, stats_top + 8, anchor="nw", text="Support", font=self._get_font("Arial", 9, "bold"))
+
+        self.drag_overlay_bounds = (
+            int(self.drag_overlay.winfo_rootx() + x1),
+            int(self.drag_overlay.winfo_rooty() + y1),
+            int(self.drag_overlay.winfo_rootx() + x2),
+            int(self.drag_overlay.winfo_rooty() + y2),
+        )
 
     def _destroy_drag_preview(self) -> None:
-        if self.preview_window:
-            self.preview_window.destroy()
-            self.preview_window = None
+        if self.drag_overlay:
+            self.drag_overlay.destroy()
+        self.drag_overlay = None
+        self.drag_overlay_canvas = None
+        self.drag_overlay_bounds = None
+        self.drag_overlay_card = None
 
     def _update_hover_target(self, x_root: int, y_root: int) -> None:
         target_idx: Optional[int] = None
+        overlay_bounds = self.drag_overlay_bounds
         for idx in (self.human_index,):
             bounds = self.drop_zone_screen_bounds.get(idx)
             if not bounds:
                 continue
+            if overlay_bounds and self._bounds_intersect(overlay_bounds, bounds):
+                target_idx = idx
+                break
             x1, y1, x2, y2 = bounds
             if x1 <= x_root <= x2 and y1 <= y_root <= y2:
                 target_idx = idx
@@ -552,6 +653,7 @@ class GameGUI:
         self._create_drag_preview(self.card_tags.get((player_idx, tag)))
         self._refresh_drop_zone_bounds()
         self.root.bind("<B1-Motion>", self._on_global_drag_motion)
+        self.root.bind("<ButtonRelease-1>", self._on_global_button_release)
 
     def _drag(self, event: tk.Event, player_idx: int, tag: str) -> None:
         if self.drag_state.tag != tag or self.drag_state.player_index != player_idx:
@@ -579,12 +681,24 @@ class GameGUI:
         self._render_hand(player_idx)
         self.drag_state = DragState()
         self.root.unbind("<B1-Motion>")
+        self.root.unbind("<ButtonRelease-1>")
 
     def _on_global_drag_motion(self, event: tk.Event) -> None:
         if not self.drag_state.tag:
             return
         self._move_drag_preview(event.x_root, event.y_root)
         self._update_hover_target(event.x_root, event.y_root)
+
+    def _on_global_button_release(self, event: tk.Event) -> None:
+        if not self.drag_state.tag or self.drag_state.player_index is None:
+            return
+        self._end_drag(event, self.drag_state.player_index, self.drag_state.tag)
+
+    @staticmethod
+    def _bounds_intersect(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> bool:
+        ax1, ay1, ax2, ay2 = a
+        bx1, by1, bx2, by2 = b
+        return not (ax2 < bx1 or bx2 < ax1 or ay2 < by1 or by2 < ay1)
 
     def draw_card(self) -> None:
         if not self._assert_human_turn():
