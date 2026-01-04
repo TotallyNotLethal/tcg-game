@@ -38,6 +38,7 @@ class GameGUI:
         self.drag_overlay_bounds: Optional[tuple[int, int, int, int]] = None
         self.drag_overlay_card: Optional[Card] = None
         self.detail_window: Optional[tk.Toplevel] = None
+        self._detail_focusable: list[tk.Widget] = []
         self.drop_zone_boxes: Dict[int, tuple[int, int, int, int]] = {}
         self.drop_zone_items: Dict[int, tuple[int, int]] = {}
         self.drop_zone_screen_bounds: Dict[int, tuple[int, int, int, int]] = {}
@@ -785,37 +786,115 @@ class GameGUI:
 
     def _close_detail_window(self) -> None:
         if self.detail_window:
+            try:
+                self.detail_window.grab_release()
+            except tk.TclError:
+                pass
             self.detail_window.destroy()
             self.detail_window = None
+        self._detail_focusable = []
 
     def _show_card_details(self, card: Card) -> None:
         self._close_detail_window()
-        self.detail_window = tk.Toplevel(self.root)
-        self.detail_window.title(f"{card.name} Details")
-        container = tk.Frame(self.detail_window, padx=10, pady=10)
-        container.pack(fill=tk.BOTH, expand=True)
+        self.root.update_idletasks()
+        root_w = max(self.root.winfo_width(), 1)
+        root_h = max(self.root.winfo_height(), 1)
+        root_x, root_y = self.root.winfo_rootx(), self.root.winfo_rooty()
 
-        tk.Label(container, text=card.name, font=("Arial", 14, "bold")).pack(anchor="w")
-        type_cost = f"Type: {card.type.name.title()} | Cost: {self._format_cost(card)}"
-        tk.Label(container, text=type_cost, font=("Arial", 10)).pack(anchor="w", pady=(2, 6))
+        overlay = tk.Toplevel(self.root)
+        overlay.overrideredirect(True)
+        overlay.geometry(f"{root_w}x{root_h}+{root_x}+{root_y}")
+        overlay.attributes("-topmost", True)
+        self.detail_window = overlay
 
-        image = self._get_card_image(card, 240, 180)
-        if image:
-            tk.Label(container, image=image).pack(anchor="center", pady=(4, 8))
+        canvas = tk.Canvas(overlay, width=root_w, height=root_h, highlightthickness=0)
+        canvas.pack(fill=tk.BOTH, expand=True)
+        canvas.create_rectangle(0, 0, root_w, root_h, fill="#000000", outline="", stipple="gray50")
 
+        anchor_x, anchor_y = self._detail_anchor_position(root_x, root_y)
+
+        card_width, card_height = 360, 520
+        anchor_x = min(max(card_width / 2 + 12, anchor_x), root_w - card_width / 2 - 12)
+        anchor_y = min(max(card_height / 2 + 12, anchor_y), root_h - card_height / 2 - 12)
+
+        frame = tk.Frame(canvas, bg="#fefcf7", bd=0)
+        canvas.create_window(anchor_x, anchor_y, window=frame)
+
+        card_canvas = tk.Canvas(frame, width=card_width, height=card_height, bg="#fefcf7", highlightthickness=0)
+        card_canvas.pack()
+        self._draw_full_card(card_canvas, card, card_width, card_height)
+
+        close_btn = tk.Button(frame, text="Close", command=self._close_detail_window)
+        close_btn.pack(pady=(8, 0))
+
+        frame.bind("<Button-1>", lambda e: "break")
+
+        overlay.bind("<Escape>", lambda e: self._close_detail_window())
+        overlay.bind("<Button-1>", lambda e: self._close_detail_window())
+        card_canvas.bind("<Button-1>", lambda e: "break")
+        close_btn.bind("<Button-1>", lambda e: "break")
+
+        self._detail_focusable = [close_btn]
+        overlay.bind("<KeyPress-Tab>", self._handle_overlay_tab)
+        overlay.bind("<KeyPress-ISO_Left_Tab>", self._handle_overlay_tab)
+        overlay.bind("<KeyPress-Escape>", lambda e: self._close_detail_window())
+        overlay.grab_set()
+        close_btn.focus_set()
+
+    def _detail_anchor_position(self, root_x: int, root_y: int) -> tuple[float, float]:
+        anchor_canvas = self.hand_canvases[self.active_index]
+        if not anchor_canvas.winfo_ismapped():
+            anchor_canvas = self.battlefield_canvases[self.active_index]
+        anchor_canvas.update_idletasks()
+        anchor_x = anchor_canvas.winfo_rootx() - root_x + anchor_canvas.winfo_width() / 2
+        anchor_y = anchor_canvas.winfo_rooty() - root_y + anchor_canvas.winfo_height() / 2
+        return anchor_x, anchor_y
+
+    def _draw_full_card(self, canvas: tk.Canvas, card: Card, width: int, height: int) -> None:
+        canvas.delete("all")
+        pad = 14
+        canvas.create_rectangle(0, 0, width, height, fill="#f4ede2", outline="#b4976a", width=2)
+        canvas.create_rectangle(6, 6, width - 6, height - 6, outline="#d1c4a4", width=1)
+
+        name_font = self._get_font("Arial", 18, "bold")
+        body_font = self._get_font("Arial", 10)
+        italic_font = self._get_font("Arial", 10, "bold")
+
+        canvas.create_text(pad, pad, anchor="nw", text=card.name, font=name_font, fill="#2b1e08")
+        type_cost = f"{card.type.name.title()} — Cost: {self._format_cost(card)}"
+        canvas.create_text(pad, pad + 28, anchor="nw", text=type_cost, font=self._get_font("Arial", 11))
+
+        info_y = pad + 52
         if card.faction:
-            tk.Label(container, text=f"Faction: {card.faction}", font=("Arial", 10, "italic")).pack(anchor="w")
+            canvas.create_text(pad, info_y, anchor="nw", text=f"Faction: {card.faction}", font=body_font)
+            info_y += 18
         if card.tags:
-            tk.Label(container, text=f"Tags: {', '.join(card.tags)}", font=("Arial", 10)).pack(anchor="w")
+            canvas.create_text(pad, info_y, anchor="nw", text=f"Tags: {', '.join(card.tags)}", font=body_font)
+            info_y += 18
 
-        if card.text:
-            tk.Label(
-                container,
-                text=card.text,
-                wraplength=380,
+        art_height = 170
+        image = self._get_card_image(card, width - pad * 2, art_height)
+        if image:
+            canvas.create_rectangle(pad, info_y, width - pad, info_y + art_height, fill="#f7f9ff", outline="#d4d8e8")
+            canvas.create_image((width) / 2, info_y + art_height / 2, image=image)
+        info_y += art_height + 12
+
+        text_block = card.text or ""
+        if isinstance(card, EventCard) and card.impact_text:
+            text_block = card.impact_text
+
+        if text_block:
+            text_id = canvas.create_text(
+                pad,
+                info_y,
+                anchor="nw",
+                text=text_block,
+                width=width - pad * 2,
+                font=body_font,
                 justify=tk.LEFT,
-                font=("Arial", 10),
-            ).pack(anchor="w", pady=(6, 6))
+            )
+            bbox = canvas.bbox(text_id)
+            info_y = (bbox[3] + 12) if bbox else info_y + 72
 
         if isinstance(card, TerritoryCard):
             yields = []
@@ -823,49 +902,63 @@ class GameGUI:
                 yields.append(f"{card.fear_yield} Fear")
             if card.belief_yield:
                 yields.append(f"{card.belief_yield} Belief")
-            yield_text = ", ".join(yields) if yields else "None"
-            tk.Label(container, text=f"Yields: {yield_text}", font=("Arial", 10, "bold")).pack(anchor="w")
+            yield_text = ", ".join(yields) if yields else "No yield"
+            canvas.create_text(pad, info_y, anchor="nw", text=f"Yields: {yield_text}", font=italic_font)
+            info_y += 22
 
         if isinstance(card, Cryptid):
-            tk.Label(container, text=f"Stats: {card.stats.describe()}", font=("Arial", 10, "bold")).pack(anchor="w")
-            tk.Label(container, text=f"Current HP: {card.current_health}", font=("Arial", 10)).pack(anchor="w")
+            stats = card.stats
+            canvas.create_rectangle(pad, info_y, width - pad, info_y + 34, fill="#eef6ff", outline="#c6d9f2")
+            canvas.create_text(
+                width / 2,
+                info_y + 17,
+                text=f"PWR {stats.power}  DEF {stats.defense}  HP {card.current_health}/{stats.health}",
+                font=italic_font,
+                fill="#1c3e7a",
+            )
+            info_y += 42
             if card.moves:
-                moves_frame = tk.LabelFrame(container, text="Moves")
-                moves_frame.pack(fill=tk.BOTH, expand=True, pady=(6, 4))
+                canvas.create_text(pad, info_y, anchor="nw", text="Moves", font=italic_font)
+                info_y += 18
                 for move in card.moves:
-                    tk.Label(
-                        moves_frame,
+                    canvas.create_text(
+                        pad,
+                        info_y,
+                        anchor="nw",
                         text=move.describe(),
-                        wraplength=360,
+                        width=width - pad * 2,
+                        font=body_font,
                         justify=tk.LEFT,
-                        anchor="w",
-                    ).pack(anchor="w", padx=6, pady=2)
-            if card.branches:
-                branches_frame = tk.LabelFrame(container, text="Branches")
-                branches_frame.pack(fill=tk.BOTH, expand=True, pady=(4, 4))
-                for branch in card.branches:
-                    tk.Label(
-                        branches_frame,
-                        text=f"{branch.name} — {branch.trigger}: {branch.effect_text}",
-                        wraplength=360,
-                        justify=tk.LEFT,
-                        anchor="w",
-                    ).pack(anchor="w", padx=6, pady=2)
+                    )
+                    info_y += 22
 
-        if isinstance(card, EventCard):
-            impact = card.impact_text or card.text
-            tk.Label(container, text=f"Impact: {impact}", wraplength=380, justify=tk.LEFT).pack(anchor="w")
+        if isinstance(card, GodCard) and card.prayer_text:
+            canvas.create_text(
+                pad,
+                info_y,
+                anchor="nw",
+                text=f"Prayer: {card.prayer_text}",
+                width=width - pad * 2,
+                font=body_font,
+                justify=tk.LEFT,
+            )
+            info_y += 38
 
-        if isinstance(card, GodCard):
-            if card.prayer_text:
-                tk.Label(
-                    container,
-                    text=f"Prayer: {card.prayer_text}",
-                    wraplength=380,
-                    justify=tk.LEFT,
-                ).pack(anchor="w")
-
-        tk.Button(container, text="Close", command=self._close_detail_window).pack(anchor="e", pady=(10, 0))
+    def _handle_overlay_tab(self, event: tk.Event) -> str:
+        if not self.detail_window:
+            return "break"
+        focusables = [w for w in self._detail_focusable if w.winfo_viewable()]
+        if not focusables:
+            return "break"
+        current = self.detail_window.focus_get()
+        try:
+            idx = focusables.index(current)
+        except ValueError:
+            idx = 0
+        direction = -1 if event.state & 0x1 else 1
+        next_idx = (idx + direction) % len(focusables)
+        focusables[next_idx].focus_set()
+        return "break"
 
     def play_queued_territory(self) -> None:
         if not self._assert_human_turn():
