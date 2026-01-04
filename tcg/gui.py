@@ -42,6 +42,8 @@ class GameGUI:
         self.drop_zone_boxes: Dict[int, tuple[int, int, int, int]] = {}
         self.drop_zone_items: Dict[int, tuple[int, int]] = {}
         self.drop_zone_screen_bounds: Dict[int, tuple[int, int, int, int]] = {}
+        self.drop_zone_gradient_items: Dict[int, list[int]] = {}
+        self.drop_zone_tooltips: Dict[int, tuple[int, int]] = {}
         self._image_cache: Dict[Tuple[str, int, int], tk.PhotoImage] = {}
         self._font_cache: Dict[Tuple[str, int, str], tkfont.Font] = {}
         self._hovered_hand_tag: Optional[str] = None
@@ -158,6 +160,8 @@ class GameGUI:
         x2, y2 = x1 + width, y1 + height
         rect_tag = f"drop_zone_{idx}_rect"
         label_tag = f"drop_zone_{idx}_label"
+        self._clear_drop_zone_gradient(idx)
+        self._clear_drop_zone_tooltip(idx)
         if idx in self.drop_zone_items:
             rect_id, label_id = self.drop_zone_items[idx]
             canvas.delete(rect_id)
@@ -182,6 +186,7 @@ class GameGUI:
         )
         self.drop_zone_boxes[idx] = (x1, y1, x2, y2)
         self.drop_zone_items[idx] = (rect_id, label_id)
+        self.drop_zone_gradient_items[idx] = []
 
     def _refresh_drop_zone_bounds(self) -> None:
         for idx, canvas in enumerate(self.battlefield_canvases):
@@ -191,16 +196,151 @@ class GameGUI:
             root_x, root_y = canvas.winfo_rootx(), canvas.winfo_rooty()
             self.drop_zone_screen_bounds[idx] = (root_x + x1, root_y + y1, root_x + x2, root_y + y2)
 
-    def _highlight_drop_zone(self, active_idx: Optional[int]) -> None:
+    def _clear_drop_zone_tooltip(self, idx: int) -> None:
+        ids = self.drop_zone_tooltips.pop(idx, None)
+        if not ids:
+            return
+        canvas = self.battlefield_canvases[idx]
+        for item_id in ids:
+            canvas.delete(item_id)
+
+    def _show_drop_tooltip(self, idx: int, text: str, color: str = "#b03030") -> None:
+        if idx not in self.drop_zone_boxes:
+            return
+        canvas = self.battlefield_canvases[idx]
+        self._clear_drop_zone_tooltip(idx)
+        x1, y1, x2, y2 = self.drop_zone_boxes[idx]
+        tip_bg = canvas.create_rectangle(
+            x1 + 10,
+            y2 - 30,
+            x2 - 10,
+            y2 - 8,
+            fill="#fff6f6",
+            outline="#d9a0a0",
+        )
+        tip_text = canvas.create_text((x1 + x2) / 2, y2 - 19, text=text, fill=color, font=("Arial", 9, "bold"))
+        self.drop_zone_tooltips[idx] = (tip_bg, tip_text)
+        canvas.after(1400, lambda idx=idx: self._clear_drop_zone_tooltip(idx))
+
+    def _clear_drop_zone_gradient(self, idx: int) -> None:
+        canvas = self.battlefield_canvases[idx]
+        for item_id in self.drop_zone_gradient_items.get(idx, []):
+            canvas.delete(item_id)
+        self.drop_zone_gradient_items[idx] = []
+
+    @staticmethod
+    def _blend_color(base: str, mix: str, ratio: float) -> str:
+        def to_rgb(value: str) -> tuple[int, int, int]:
+            value = value.lstrip("#")
+            return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16)
+
+        base_r, base_g, base_b = to_rgb(base)
+        mix_r, mix_g, mix_b = to_rgb(mix)
+        r = int(base_r * (1 - ratio) + mix_r * ratio)
+        g = int(base_g * (1 - ratio) + mix_g * ratio)
+        b = int(base_b * (1 - ratio) + mix_b * ratio)
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    def _apply_drop_zone_glow(self, idx: int, base_color: str) -> None:
+        if idx not in self.drop_zone_boxes:
+            return
+        canvas = self.battlefield_canvases[idx]
+        self._clear_drop_zone_gradient(idx)
+        x1, y1, x2, y2 = self.drop_zone_boxes[idx]
+        steps = 5
+        items: list[int] = []
+        for i in range(steps):
+            ratio = (i + 1) / (steps + 1)
+            color = self._blend_color(base_color, "#ffffff", ratio * 0.6)
+            inset = 2 + i * 3
+            rect = canvas.create_rectangle(
+                x1 + inset,
+                y1 + inset,
+                x2 - inset,
+                y2 - inset,
+                fill=color,
+                outline="",
+            )
+            items.append(rect)
+        self.drop_zone_gradient_items[idx] = items
+
+    def _format_cost_text(self, card: Card) -> str:
+        parts: list[str] = []
+        if card.cost_belief:
+            parts.append(f"{card.cost_belief} Belief")
+        if card.cost_fear:
+            parts.append(f"{card.cost_fear} Fear")
+        return "Cost: " + (", ".join(parts) if parts else "Free")
+
+    def _affordability_info(self, card: Optional[Card]) -> tuple[bool, str]:
+        if not card:
+            return True, ""
+        pool = self.game.players[self.human_index].resources
+        missing_fear = max(card.cost_fear - pool.fear, 0)
+        missing_belief = max(card.cost_belief - pool.belief, 0)
+        if not missing_fear and not missing_belief:
+            return True, "Affordable"
+        missing_parts = []
+        if missing_belief:
+            missing_parts.append(f"{missing_belief} Belief")
+        if missing_fear:
+            missing_parts.append(f"{missing_fear} Fear")
+        return False, f"Need {', '.join(missing_parts)}"
+
+    def _highlight_drop_zone(self, active_idx: Optional[int], card: Optional[Card] = None) -> None:
+        if active_idx is None:
+            for idx in list(self.drop_zone_tooltips.keys()):
+                self._clear_drop_zone_tooltip(idx)
         for idx, items in self.drop_zone_items.items():
             rect_id, label_id = items
             canvas = self.battlefield_canvases[idx]
             is_active = active_idx == idx
-            fill = "#d7ebff" if is_active else "#eef2ff"
-            outline = "#2f6ad9" if is_active else "#7a8cff"
-            text_color = "#0f2b5c" if is_active else "#1f4b99"
-            canvas.itemconfigure(rect_id, fill=fill, outline=outline)
-            canvas.itemconfigure(label_id, fill=text_color)
+            display_card = card if is_active else None
+            affordable, status = self._affordability_info(display_card)
+            if is_active and display_card:
+                cost_text = self._format_cost_text(display_card)
+                label = f"Release to play — {cost_text} ({status})"
+            else:
+                label = "Drop to play"
+            fill = "#eef2ff"
+            outline = "#7a8cff"
+            text_color = "#1f4b99"
+            dash = (3, 2)
+            width = 1
+            if is_active:
+                if display_card and not affordable:
+                    fill = "#ffe5e5"
+                    outline = "#d24b4b"
+                    text_color = "#7a0f0f"
+                    self._clear_drop_zone_gradient(idx)
+                else:
+                    fill = "#d7ebff"
+                    outline = "#2f6ad9"
+                    text_color = "#0f2b5c"
+                    self._apply_drop_zone_glow(idx, "#9dc3ff")
+                dash = ()
+                width = 3
+            else:
+                self._clear_drop_zone_gradient(idx)
+            canvas.itemconfigure(rect_id, fill=fill, outline=outline, dash=dash, width=width)
+            canvas.itemconfigure(label_id, fill=text_color, text=label)
+
+    def _animate_drop(self, idx: int) -> None:
+        if idx not in self.drop_zone_items:
+            return
+        rect_id, _ = self.drop_zone_items[idx]
+        canvas = self.battlefield_canvases[idx]
+        original_fill = canvas.itemcget(rect_id, "fill")
+        pulse_colors = ["#fff4cc", "#ffe89c", str(original_fill)]
+
+        def step(colors: list[str]) -> None:
+            if not colors:
+                return
+            color = colors.pop(0)
+            canvas.itemconfigure(rect_id, fill=color)
+            canvas.after(90, lambda: step(colors))
+
+        step(pulse_colors)
 
     def _get_card_image(self, card: Card, max_width: int, max_height: int) -> Optional[tk.PhotoImage]:
         path = Path(card.asset_path())
@@ -288,8 +428,15 @@ class GameGUI:
 
         card_w = 170
         card_h = 220
-        local_x = x_root - self.drag_overlay.winfo_rootx()
-        local_y = y_root - self.drag_overlay.winfo_rooty()
+        snap_x, snap_y = x_root, y_root
+        if self.drag_state.hovered_target is not None:
+            bounds = self.drop_zone_screen_bounds.get(self.drag_state.hovered_target)
+            if bounds:
+                snap_x = (bounds[0] + bounds[2]) / 2
+                snap_y = (bounds[1] + bounds[3]) / 2
+
+        local_x = snap_x - self.drag_overlay.winfo_rootx()
+        local_y = snap_y - self.drag_overlay.winfo_rooty()
         x1 = local_x - card_w / 2
         y1 = local_y - card_h / 2
         x2 = x1 + card_w
@@ -390,7 +537,7 @@ class GameGUI:
                 break
         if target_idx != self.drag_state.hovered_target:
             self.drag_state.hovered_target = target_idx
-            self._highlight_drop_zone(target_idx)
+            self._highlight_drop_zone(target_idx, self.drag_overlay_card)
 
     def _render_hand(self, idx: int) -> None:
         canvas = self.hand_canvases[idx]
@@ -674,10 +821,17 @@ class GameGUI:
         card = self.card_tags.get((player_idx, tag))
         if not card:
             return
+        should_reset_highlight = True
         if self.drag_state.hovered_target is not None:
-            if self._play_card(player_idx, card):
+            affordable, status = self._affordability_info(card)
+            if not affordable:
+                self._show_drop_tooltip(self.drag_state.hovered_target, status)
+            elif self._play_card(player_idx, card):
                 self._clear_selection()
-        self._highlight_drop_zone(None)
+                self._animate_drop(self.drag_state.hovered_target)
+                should_reset_highlight = False
+        if should_reset_highlight:
+            self._highlight_drop_zone(None)
         self._destroy_drag_preview()
         self._render_hand(player_idx)
         self.drag_state = DragState()
