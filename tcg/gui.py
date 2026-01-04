@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
+from PIL import Image, ImageTk
+
 from .cards import Card, Cryptid, EventCard, GodCard, TerritoryCard
 from .game import GameState, initial_game
 
@@ -352,20 +354,20 @@ class GameGUI:
             return self._image_cache[cache_key]
 
         try:
-            image = tk.PhotoImage(file=str(path))
-        except tk.TclError:
+            image = Image.open(path).convert("RGBA")
+        except (OSError, FileNotFoundError):
             return None
 
-        scale_factor = max(
-            (image.width() + max_width - 1) // max_width,
-            (image.height() + max_height - 1) // max_height,
-            1,
-        )
-        if scale_factor > 1:
-            image = image.subsample(scale_factor, scale_factor)
+        width, height = image.size
+        if width > max_width or height > max_height:
+            scale = min(max_width / max(width, 1), max_height / max(height, 1))
+            new_width = max(int(width * scale), 1)
+            new_height = max(int(height * scale), 1)
+            image = image.resize((new_width, new_height), Image.LANCZOS)
 
-        self._image_cache[cache_key] = image
-        return image
+        tk_image = ImageTk.PhotoImage(image)
+        self._image_cache[cache_key] = tk_image
+        return tk_image
 
     def _get_font(self, family: str, size: int, weight: str = "normal") -> tkfont.Font:
         key = (family, size, weight)

@@ -35,6 +35,8 @@ An interactive Tkinter GUI supports drag-to-play, stack resolution, and god pray
 
 ```bash
 python -m tcg.gui
+# install GUI helpers (Pillow for images, optional themed widgets)
+pip install -r requirements/ux.txt
 ```
 
 - Drag cards from the active player's hand canvas into their battlefield to play them if affordable.
