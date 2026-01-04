@@ -5,6 +5,7 @@ import argparse
 import base64
 import sys
 from pathlib import Path
+import re
 from typing import Iterable, Set
 
 import requests
@@ -16,7 +17,25 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from tcg.cards import Card, cryptid_pool, event_pool, god_pool, slugify, territory_card_pool
+from tcg.cards import (
+    Card,
+    CardType,
+    cryptid_pool,
+    event_pool,
+    god_pool,
+    slugify,
+    territory_card_pool,
+)
+
+
+TAG_SCENE_CUES = {
+    "forest": "mist-laced ancient forest with towering trees and mossy stones",
+    "aquatic": "murky bayou water with cypress roots and bioluminescent mist",
+    "urban": "rain-slicked city alley with cracked concrete and neon reflections",
+    "storm": "lightning-slashed sky with swirling clouds and wind-tossed silhouettes",
+    "desert": "sun-bleached badlands with eroded rock spires and drifting dust",
+    "frost": "glacial tundra with drifting snow and jagged ice formations",
+}
 
 
 def iter_unique_cards() -> Iterable[Card]:
@@ -32,18 +51,96 @@ def iter_unique_cards() -> Iterable[Card]:
             yield card
 
 
+def _scene_from_tags(tags: Iterable[str]) -> str:
+    for tag in tags:
+        normalized = tag.lower()
+        for keyword, description in TAG_SCENE_CUES.items():
+            if keyword in normalized:
+                return description
+    return "moody natural biome that fits the legend"
+
+
+def _text_snippet(text: str, *, limit: int = 140) -> str:
+    cleaned = re.sub(r"\s+", " ", text or "").strip()
+    if not cleaned:
+        return ""
+
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", cleaned) if part.strip()]
+    snippet = sentences[0] if sentences else cleaned
+    if len(snippet) > limit:
+        snippet = snippet[:limit].rstrip()
+        if snippet and snippet[-1] not in {".", "!", "?"}:
+            snippet += "..."
+    return snippet
+
+
 def build_prompt(card: Card) -> str:
-    """Create an descriptive prompt for the image model based on card data."""
+    """Create a descriptive prompt for the image model based on card data."""
 
-    parts = [f"A cryptid illustration of a '{card.name}' creature, same shared universe and art style, semi-realistic dark folklore realism, anatomically grounded but unnatural, muted earth-tone palette, low-key cinematic lighting, subtle horror without gore, highly detailed textures, mythic and ancient atmosphere, natural environment background, shallow depth of field, no text, no symbols, no borders"]
+    scene = _scene_from_tags(card.tags)
+    lore_snippet = _text_snippet(card.text)
 
-    #parts = [f"Illustration for a trading card named '{card.name}'."]
-    #parts.append(f"Card type: {card.type.name.title()}.")
-    #if card.tags:
-    #    parts.append(f"Style cues/tags: {', '.join(card.tags)}.")
-    #if card.text:
-    #    parts.append(f"Card rules text: {card.text}")
-    return " ".join(parts)
+    if card.type == CardType.CRYPTID:
+        parts = [
+            (
+                f"Standalone creature portrait of '{card.name}' in the shared universe, "
+                "semi-realistic dark folklore realism, anatomically grounded yet uncanny, "
+                "muted earth-tone palette, cinematic lighting tuned to its biome"
+            ),
+            f"Scene: {scene} with atmospheric depth and tangible weathering.",
+            "Full body or three-quarter view of the creature centered in the frame, naturalistic background only.",
+        ]
+        if lore_snippet:
+            parts.append(f"Lore cue from card text: {lore_snippet}.")
+        parts.append(
+            "Shallow depth of field, subtle horror without gore, highly detailed textures, no text, no symbols, no borders, no card frame."
+        )
+        return " ".join(parts)
+
+    if card.type == CardType.TERRITORY:
+        parts = [
+            (
+                f"Atmospheric landscape concept art for territory '{card.name}', painterly and grounded, "
+                "captures the feel of the battlefield location"
+            ),
+            f"Environment cue: {scene}.",
+        ]
+        if lore_snippet:
+            parts.append(f"Mood inspired by card text: {lore_snippet}.")
+        parts.append("No card frame or overlays, no text, cinematic composition.")
+        return " ".join(parts)
+
+    if card.type == CardType.EVENT:
+        parts = [
+            (
+                f"Dynamic vignette of the event '{card.name}', energy and motion emphasized, "
+                "magical realism style"
+            ),
+            f"Backdrop hint: {scene}.",
+        ]
+        if lore_snippet:
+            parts.append(f"Effect flavor: {lore_snippet}.")
+        parts.append("Symbolic props only, no UI elements, no borders, no lettering.")
+        return " ".join(parts)
+
+    if card.type == CardType.GOD:
+        parts = [
+            (
+                f"Majestic deity portrait for '{card.name}', mythic grandeur with sacred motifs, "
+                "semi-realistic painterly render"
+            ),
+            f"Setting: {scene}.",
+        ]
+        if lore_snippet:
+            parts.append(f"Divine aspect hint: {lore_snippet}.")
+        parts.append("Glowing rim light, no human text, no borders, no card framing.")
+        return " ".join(parts)
+
+    return (
+        f"Standalone illustration of '{card.name}', cinematic and cohesive art direction. "
+        f"Scene suggestion: {scene}. "
+        f"No text, no UI, no card frame."
+    )
 
 
 def generate_image(
