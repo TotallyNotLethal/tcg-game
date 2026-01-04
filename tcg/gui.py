@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
+import ttkbootstrap as tb
 from PIL import Image, ImageTk
 
 from .cards import Card, Cryptid, EventCard, GodCard, TerritoryCard
@@ -23,19 +24,27 @@ class DragState:
 
 
 class GameGUI:
-    BG_COLOR = "#0c111f"
-    PANEL_COLOR = "#141c2f"
-    SURFACE_COLOR = "#1c2540"
-    HAND_COLOR = "#101827"
-    TEXT_COLOR = "#e8ecf6"
-    MUTED_TEXT = "#9cb2d9"
-    BORDER_COLOR = "#26375c"
-    ACCENT_COLOR = "#6ce2d6"
-    SECONDARY_ACCENT = "#7db4ff"
+    BG_COLOR = "#0d0a11"
+    TABLE_COLOR = "#1b1118"
+    PANEL_COLOR = "#221723"
+    SURFACE_COLOR = "#2d1f2f"
+    HAND_COLOR = "#1a121d"
+    TEXT_COLOR = "#f4efe5"
+    MUTED_TEXT = "#c3b7c5"
+    BORDER_COLOR = "#3b2a3c"
+    ACCENT_COLOR = "#d1a95a"
+    SECONDARY_ACCENT = "#7ec6ff"
     ALERT_COLOR = "#ff8c8c"
+    SHADOW_COLOR = "#0a060a"
+    CARD_FACE = "#2a1b28"
+    CARD_INNER = "#160e17"
+    CARD_TYPE_STRIP = "#312b39"
+    FIELD_GLOW = "#3fc3a3"
+    FACTION_BANNER = "#3d4b6a"
 
     def __init__(self, deck_template: str = "balanced") -> None:
-        self.root = tk.Tk()
+        self.style = tb.Style(theme="cyborg")
+        self.root = self.style.master
         self.root.title("Cryptid TCG Prototype")
         self.root.configure(bg=self.BG_COLOR)
         self.root.option_add("*Font", "Arial 10")
@@ -58,6 +67,7 @@ class GameGUI:
         self.drop_zone_items: Dict[int, tuple[int, int]] = {}
         self.drop_zone_screen_bounds: Dict[int, tuple[int, int, int, int]] = {}
         self.drop_zone_gradient_items: Dict[int, list[int]] = {}
+        self.drop_zone_glow_items: Dict[int, list[int]] = {}
         self.drop_zone_tooltips: Dict[int, tuple[int, int]] = {}
         self._image_cache: Dict[Tuple[str, int, int], tk.PhotoImage] = {}
         self._font_cache: Dict[Tuple[str, int, str], tkfont.Font] = {}
@@ -70,29 +80,29 @@ class GameGUI:
         banner = tk.Frame(
             self.root,
             bg=self.PANEL_COLOR,
-            highlightbackground=self.BORDER_COLOR,
+            highlightbackground=self.ACCENT_COLOR,
             highlightthickness=1,
-            padx=12,
-            pady=8,
+            padx=14,
+            pady=10,
         )
-        banner.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 6))
+        banner.pack(side=tk.TOP, fill=tk.X, padx=12, pady=(12, 8))
         tk.Label(
             banner,
-            text="Cryptid TCG Prototype",
+            text="CRYPTID RITES",
             bg=self.PANEL_COLOR,
             fg=self.ACCENT_COLOR,
-            font=("Arial", 14, "bold"),
+            font=("Cinzel", 16, "bold"),
         ).pack(anchor="w")
         tk.Label(
             banner,
-            text="Tactical ritual skirmish — drag cards onto the field to deploy.",
+            text="Drag sigils and beasts onto the ritual field. Stack resolves in style.",
             bg=self.PANEL_COLOR,
             fg=self.MUTED_TEXT,
-            font=("Arial", 9),
+            font=("Arial", 10),
         ).pack(anchor="w", pady=(2, 0))
 
         control_frame = tk.Frame(self.root, bg=self.BG_COLOR)
-        control_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(0, 8))
+        control_frame.pack(side=tk.TOP, fill=tk.X, padx=12, pady=(0, 8))
 
         self.active_label = tk.Label(
             control_frame,
@@ -116,8 +126,8 @@ class GameGUI:
                 bd=0,
                 padx=12,
                 pady=6,
-                highlightbackground=self.BORDER_COLOR,
-                highlightthickness=1,
+                highlightbackground=self.ACCENT_COLOR,
+                highlightthickness=2,
                 font=("Arial", 10, "bold"),
             )
 
@@ -131,8 +141,8 @@ class GameGUI:
         ]:
             make_button(label, cmd).pack(side=tk.LEFT, padx=4)
 
-        board_frame = tk.Frame(self.root, bg=self.BG_COLOR)
-        board_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=8, pady=4)
+        board_frame = tk.Frame(self.root, bg=self.TABLE_COLOR)
+        board_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=6)
 
         # CPU (index 0) on top, human (index 1) on bottom for clarity
         self.player_frames = []
@@ -145,15 +155,15 @@ class GameGUI:
             frame = tk.Frame(
                 board_frame,
                 bg=self.PANEL_COLOR,
-                highlightbackground=self.BORDER_COLOR,
+                highlightbackground=self.ACCENT_COLOR,
                 highlightthickness=1,
-                padx=8,
-                pady=6,
+                padx=10,
+                pady=8,
             )
-            frame.pack(side=tk.TOP, fill=tk.X, padx=8, pady=6)
+            frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=8)
             self.player_frames.append(frame)
 
-            header = tk.Frame(frame, bg=self.SURFACE_COLOR, padx=6, pady=4)
+            header = tk.Frame(frame, bg=self.SURFACE_COLOR, padx=8, pady=6)
             header.pack(side=tk.TOP, fill=tk.X)
             tk.Label(
                 header,
@@ -164,7 +174,7 @@ class GameGUI:
             ).pack(side=tk.LEFT)
 
             info_frame = tk.Frame(frame, bg=self.PANEL_COLOR)
-            info_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
+            info_frame.pack(side=tk.TOP, fill=tk.X, pady=4)
             resource_lbl = tk.Label(
                 info_frame,
                 text="Resources",
@@ -187,17 +197,17 @@ class GameGUI:
 
             battlefield = tk.Canvas(
                 frame,
-                height=150,
+                height=180,
                 bg=self.SURFACE_COLOR,
                 highlightthickness=1,
                 highlightbackground=self.BORDER_COLOR,
             )
-            battlefield.pack(side=tk.TOP, fill=tk.X, padx=4, pady=(6, 4))
+            battlefield.pack(side=tk.TOP, fill=tk.X, padx=4, pady=(8, 6))
             self.battlefield_canvases.append(battlefield)
 
             hand = tk.Canvas(
                 frame,
-                height=130,
+                height=150,
                 bg=self.HAND_COLOR,
                 highlightthickness=1,
                 highlightbackground=self.BORDER_COLOR,
@@ -208,12 +218,12 @@ class GameGUI:
         log_frame = tk.Frame(
             self.root,
             bg=self.PANEL_COLOR,
-            highlightbackground=self.BORDER_COLOR,
+            highlightbackground=self.ACCENT_COLOR,
             highlightthickness=1,
-            padx=8,
-            pady=6,
+            padx=10,
+            pady=8,
         )
-        log_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, padx=8, pady=8)
+        log_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, padx=10, pady=10)
         tk.Label(
             log_frame,
             text="Action Log",
@@ -254,56 +264,120 @@ class GameGUI:
         player = self.game.players[idx]
         self._draw_drop_zone(idx)
         for i, card in enumerate(player.battlefield):
-            x = 10 + i * 130
-            y = 10
+            x = 16 + i * 150
+            y = 12
+            width = 140
+            height = 150
+            shadow = canvas.create_rectangle(
+                x + 6,
+                y + 8,
+                x + width + 6,
+                y + height + 8,
+                fill=self.SHADOW_COLOR,
+                outline="",
+            )
             rect = canvas.create_rectangle(
                 x,
                 y,
-                x + 120,
-                y + 130,
-                fill=self.SURFACE_COLOR,
-                outline=self.SECONDARY_ACCENT,
+                x + width,
+                y + height,
+                fill=self.CARD_FACE,
+                outline=self.ACCENT_COLOR,
                 width=2,
             )
+            canvas.create_rectangle(
+                x + 5,
+                y + 5,
+                x + width - 5,
+                y + height - 5,
+                fill=self.CARD_INNER,
+                outline=self.BORDER_COLOR,
+                width=1,
+            )
+            name_bar = canvas.create_rectangle(
+                x + 8,
+                y + 8,
+                x + width - 8,
+                y + 30,
+                fill=self.CARD_TYPE_STRIP,
+                outline=self.ACCENT_COLOR,
+                width=1,
+            )
             canvas.create_text(
-                x + 60,
-                y + 15,
+                x + 12,
+                y + 19,
+                anchor="w",
                 text=card.name,
                 font=("Arial", 10, "bold"),
                 fill=self.TEXT_COLOR,
             )
-            image = self._get_card_image(card, 80, 60)
-            if image:
-                canvas.create_image(x + 60, y + 50, image=image)
-                desc_y = y + 95
-            else:
-                desc_y = y + 70
+            if card.cost_belief or card.cost_fear:
+                cost_text = self._format_cost(card)
+                canvas.create_text(
+                    x + width - 10,
+                    y + 19,
+                    anchor="e",
+                    text=cost_text,
+                    font=self._get_font("Arial", 9, "bold"),
+                    fill=self.SECONDARY_ACCENT,
+                )
+            art_image = self._get_card_image(card, 90, 65)
+            art_top = y + 36
+            art_height = 70
+            canvas.create_rectangle(
+                x + 10,
+                art_top,
+                x + width - 10,
+                art_top + art_height,
+                fill=self.PANEL_COLOR,
+                outline=self.BORDER_COLOR,
+            )
+            if art_image:
+                canvas.create_image(x + width / 2, art_top + art_height / 2, image=art_image)
+            desc_y = art_top + art_height + 6
             canvas.create_text(
-                x + 60,
+                x + 12,
                 desc_y,
-                text=card.text[:40] + ("..." if len(card.text) > 40 else ""),
-                width=110,
+                anchor="nw",
+                text=card.text[:70] + ("..." if len(card.text) > 70 else ""),
+                width=width - 24,
+                font=self._get_font("Arial", 9),
                 fill=self.MUTED_TEXT,
             )
-            stats_y = desc_y + 18
+            stats_y = desc_y + 32
+            banner = canvas.create_rectangle(
+                x + 10,
+                stats_y,
+                x + width - 10,
+                stats_y + 24,
+                fill=self.FACTION_BANNER,
+                outline=self.ACCENT_COLOR,
+                width=1,
+            )
             if isinstance(card, Cryptid):
-                canvas.create_text(x + 60, stats_y, text=card.stats.describe(), fill=self.ACCENT_COLOR)
                 canvas.create_text(
-                    x + 60,
-                    stats_y + 18,
-                    text=f"Current HP: {card.current_health}",
-                    fill=self.SECONDARY_ACCENT,
+                    x + width / 2,
+                    stats_y + 12,
+                    text=f"PWR {card.stats.power}  DEF {card.stats.defense}  HP {card.current_health}/{card.stats.health}",
+                    font=self._get_font("Arial", 9, "bold"),
+                    fill=self.TEXT_COLOR,
                 )
             elif isinstance(card, GodCard):
                 canvas.create_text(
-                    x + 60,
-                    stats_y,
-                    text=card.prayer_text or card.text,
-                    width=110,
+                    x + width / 2,
+                    stats_y + 12,
+                    text=card.prayer_text or "Divinity", 
+                    font=self._get_font("Arial", 9, "bold"),
                     fill=self.TEXT_COLOR,
                 )
             else:
-                canvas.create_text(x + 60, stats_y, text=card.text, width=110, fill=self.TEXT_COLOR)
+                canvas.create_text(
+                    x + width / 2,
+                    stats_y + 12,
+                    text="Support",
+                    font=self._get_font("Arial", 9, "bold"),
+                    fill=self.TEXT_COLOR,
+                )
             canvas.itemconfigure(rect, tags=(f"bf_{idx}_{i}",))
 
     def _draw_drop_zone(self, idx: int) -> None:
@@ -322,27 +396,32 @@ class GameGUI:
             rect_id, label_id = self.drop_zone_items[idx]
             canvas.delete(rect_id)
             canvas.delete(label_id)
+        gradient_items = self._create_vertical_gradient(
+            canvas, x1, y1, x2, y2, start=self.TABLE_COLOR, end=self.SURFACE_COLOR, steps=14
+        )
         rect_id = canvas.create_rectangle(
-            x1,
-            y1,
-            x2,
-            y2,
-            dash=(3, 2),
-            outline=self.SECONDARY_ACCENT,
-            fill=self.SURFACE_COLOR,
+            x1 + 2,
+            y1 + 2,
+            x2 - 2,
+            y2 - 2,
+            dash=(),
+            outline=self.ACCENT_COLOR,
+            width=2,
+            fill="",
             tags=(rect_tag,),
         )
         label_id = canvas.create_text(
             (x1 + x2) / 2,
-            y1 + 15,
-            text="Drop to play",
-            font=("Arial", 10, "bold"),
+            y1 + 18,
+            text="Enchanted field — drop to deploy",
+            font=("Arial", 11, "bold"),
             fill=self.TEXT_COLOR,
             tags=(label_tag,),
         )
+        self.drop_zone_gradient_items[idx] = gradient_items
+        self.drop_zone_glow_items[idx] = []
         self.drop_zone_boxes[idx] = (x1, y1, x2, y2)
         self.drop_zone_items[idx] = (rect_id, label_id)
-        self.drop_zone_gradient_items[idx] = []
 
     def _refresh_drop_zone_bounds(self) -> None:
         for idx, canvas in enumerate(self.battlefield_canvases):
@@ -390,6 +469,12 @@ class GameGUI:
             canvas.delete(item_id)
         self.drop_zone_gradient_items[idx] = []
 
+    def _clear_drop_zone_glow(self, idx: int) -> None:
+        canvas = self.battlefield_canvases[idx]
+        for item_id in self.drop_zone_glow_items.get(idx, []):
+            canvas.delete(item_id)
+        self.drop_zone_glow_items[idx] = []
+
     @staticmethod
     def _blend_color(base: str, mix: str, ratio: float) -> str:
         def to_rgb(value: str) -> tuple[int, int, int]:
@@ -403,11 +488,23 @@ class GameGUI:
         b = int(base_b * (1 - ratio) + mix_b * ratio)
         return f"#{r:02x}{g:02x}{b:02x}"
 
+    def _create_vertical_gradient(
+        self, canvas: tk.Canvas, x1: int, y1: int, x2: int, y2: int, start: str, end: str, steps: int = 16
+    ) -> list[int]:
+        items: list[int] = []
+        height = y2 - y1
+        for i in range(steps):
+            ratio = i / max(steps - 1, 1)
+            color = self._blend_color(start, end, ratio)
+            rect = canvas.create_rectangle(x1, y1 + (height / steps) * i, x2, y1 + (height / steps) * (i + 1), outline="", fill=color)
+            items.append(rect)
+        return items
+
     def _apply_drop_zone_glow(self, idx: int, base_color: str) -> None:
         if idx not in self.drop_zone_boxes:
             return
         canvas = self.battlefield_canvases[idx]
-        self._clear_drop_zone_gradient(idx)
+        self._clear_drop_zone_glow(idx)
         x1, y1, x2, y2 = self.drop_zone_boxes[idx]
         steps = 5
         items: list[int] = []
@@ -424,7 +521,7 @@ class GameGUI:
                 outline="",
             )
             items.append(rect)
-        self.drop_zone_gradient_items[idx] = items
+        self.drop_zone_glow_items[idx] = items
 
     def _format_cost_text(self, card: Card) -> str:
         parts: list[str] = []
@@ -474,7 +571,7 @@ class GameGUI:
                     fill = self.ALERT_COLOR
                     outline = self.ALERT_COLOR
                     text_color = self.BG_COLOR
-                    self._clear_drop_zone_gradient(idx)
+                    self._clear_drop_zone_glow(idx)
                 else:
                     fill = self.SURFACE_COLOR
                     outline = self.ACCENT_COLOR
@@ -483,7 +580,7 @@ class GameGUI:
                 dash = ()
                 width = 3
             else:
-                self._clear_drop_zone_gradient(idx)
+                self._clear_drop_zone_glow(idx)
             canvas.itemconfigure(rect_id, fill=fill, outline=outline, dash=dash, width=width)
             canvas.itemconfigure(label_id, fill=text_color, text=label)
 
@@ -741,7 +838,7 @@ class GameGUI:
                 y_adjust + 10,
                 x_adjust + scaled_w + 6,
                 y_adjust + scaled_h + 10,
-                fill="#080a12",
+                fill=self.SHADOW_COLOR,
                 outline="",
                 tags=(tag,),
             )
@@ -750,8 +847,8 @@ class GameGUI:
                 y_adjust,
                 x_adjust + scaled_w,
                 y_adjust + scaled_h,
-                fill=self.SURFACE_COLOR,
-                outline=self.SECONDARY_ACCENT,
+                fill=self.CARD_FACE,
+                outline=self.ACCENT_COLOR if is_selected else self.SECONDARY_ACCENT,
                 width=3 if is_selected else 2,
                 tags=(tag,),
             )
@@ -760,7 +857,7 @@ class GameGUI:
                 y_adjust + 6,
                 x_adjust + scaled_w - 6,
                 y_adjust + scaled_h - 6,
-                fill=self.BG_COLOR,
+                fill=self.CARD_INNER,
                 outline=self.BORDER_COLOR,
                 width=1,
                 tags=(tag,),
@@ -771,7 +868,7 @@ class GameGUI:
                 y_adjust + 6,
                 x_adjust + scaled_w - 6,
                 y_adjust + 34,
-                fill=self.PANEL_COLOR,
+                fill=self.CARD_TYPE_STRIP,
                 outline="",
                 tags=(tag,),
             )
@@ -792,8 +889,8 @@ class GameGUI:
                     y_adjust + 10,
                     cost_x - 6,
                     y_adjust + 24,
-                    fill="#f3d48c",
-                    outline="#b08a28",
+                    fill="#f5e4b5",
+                    outline=self.ACCENT_COLOR,
                     width=1,
                     tags=(tag,),
                 )
@@ -802,7 +899,7 @@ class GameGUI:
                     y_adjust + 17,
                     text=str(card.cost_belief),
                     font=tiny_font,
-                    fill="#5b420f",
+                    fill="#3a280c",
                     tags=(tag,),
                 )
                 cost_x -= 22
@@ -812,7 +909,7 @@ class GameGUI:
                     y_adjust + 10,
                     cost_x - 6,
                     y_adjust + 24,
-                    fill="#bfc9ff",
+                    fill="#c8ddff",
                     outline=self.SECONDARY_ACCENT,
                     width=1,
                     tags=(tag,),
@@ -867,8 +964,8 @@ class GameGUI:
                     stats_top,
                     x_adjust + scaled_w - 10,
                     stats_top + stat_box_height,
-                    fill=self.PANEL_COLOR,
-                    outline=self.SECONDARY_ACCENT,
+                    fill=self.CARD_TYPE_STRIP,
+                    outline=self.ACCENT_COLOR,
                     tags=(tag,),
                 )
                 canvas.create_text(
