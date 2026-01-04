@@ -770,6 +770,8 @@ class GameGUI:
     def _set_hover(self, tag: str, player_idx: int) -> None:
         if player_idx != self.human_index:
             return
+        if self._hovered_hand_tag == tag:
+            return
         self._hovered_hand_tag = tag
         self._render_hand(player_idx)
 
