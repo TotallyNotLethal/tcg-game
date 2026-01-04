@@ -48,6 +48,8 @@ class GameGUI:
         self.root.title("Cryptid TCG Prototype")
         self.root.configure(bg=self.BG_COLOR)
         self.root.option_add("*Font", "Arial 10")
+        self.root.geometry("1280x960")
+        self.root.minsize(1100, 900)
         self.game: GameState = initial_game(deck_template)
         self.cpu_index: int = 0
         self.human_index: int = 1
@@ -144,8 +146,36 @@ class GameGUI:
         ]:
             make_button(label, cmd).pack(side=tk.LEFT, padx=4)
 
-        board_frame = tk.Frame(self.root, bg=self.TABLE_COLOR)
-        board_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=6)
+        board_container = tk.Frame(self.root, bg=self.TABLE_COLOR)
+        board_container.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=6)
+        board_canvas = tk.Canvas(
+            board_container,
+            bg=self.TABLE_COLOR,
+            highlightthickness=0,
+            bd=0,
+            relief=tk.FLAT,
+        )
+        board_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar = tk.Scrollbar(board_container, orient=tk.VERTICAL, command=board_canvas.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        board_canvas.configure(yscrollcommand=scrollbar.set)
+
+        board_frame = tk.Frame(board_canvas, bg=self.TABLE_COLOR)
+        board_window = board_canvas.create_window((0, 0), window=board_frame, anchor="nw")
+
+        def _sync_scroll_region(_: tk.Event) -> None:
+            board_canvas.configure(scrollregion=board_canvas.bbox("all"))
+
+        def _sync_width(event: tk.Event) -> None:
+            board_canvas.itemconfig(board_window, width=event.width)
+
+        board_frame.bind("<Configure>", _sync_scroll_region)
+        board_canvas.bind("<Configure>", _sync_width)
+
+        def _on_mousewheel(event: tk.Event) -> None:
+            board_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        board_canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
         # CPU (index 0) on top, human (index 1) on bottom for clarity
         self.player_frames = []
@@ -212,7 +242,7 @@ class GameGUI:
 
             hand = tk.Canvas(
                 frame,
-                height=150,
+                height=280,
                 bg=self.HAND_COLOR,
                 highlightthickness=1,
                 highlightbackground=self.BORDER_COLOR,
@@ -1125,7 +1155,7 @@ class GameGUI:
         card_height = 190
         overlap = 70
         start_x = max((canvas.winfo_width() - (card_width + overlap * (hand_size - 1))) / 2, 10)
-        base_y = 8
+        base_y = 18
         center_index = (hand_size - 1) / 2
 
         header_font = self._get_font("Arial", 10, "bold")
