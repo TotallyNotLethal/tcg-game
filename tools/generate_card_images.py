@@ -83,15 +83,18 @@ def build_prompt(card: Card) -> str:
     if card.type == CardType.CRYPTID:
         parts = [
             (
-                f"Cryptid illustration of '{card.name}' in the shared universe, "
+                f"Standalone creature portrait of '{card.name}' in the shared universe, "
                 "semi-realistic dark folklore realism, anatomically grounded yet uncanny, "
                 "muted earth-tone palette, cinematic lighting tuned to its biome"
             ),
             f"Scene: {scene} with atmospheric depth and tangible weathering.",
+            "Full body or three-quarter view of the creature centered in the frame, naturalistic background only.",
         ]
         if lore_snippet:
             parts.append(f"Lore cue from card text: {lore_snippet}.")
-        parts.append("Shallow depth of field, subtle horror without gore, highly detailed textures, no text, no symbols, no borders.")
+        parts.append(
+            "Shallow depth of field, subtle horror without gore, highly detailed textures, no text, no symbols, no borders, no card frame."
+        )
         return " ".join(parts)
 
     if card.type == CardType.TERRITORY:
@@ -104,7 +107,7 @@ def build_prompt(card: Card) -> str:
         ]
         if lore_snippet:
             parts.append(f"Mood inspired by card text: {lore_snippet}.")
-        parts.append("No card frame, no text, cinematic composition.")
+        parts.append("No card frame or overlays, no text, cinematic composition.")
         return " ".join(parts)
 
     if card.type == CardType.EVENT:
@@ -117,7 +120,7 @@ def build_prompt(card: Card) -> str:
         ]
         if lore_snippet:
             parts.append(f"Effect flavor: {lore_snippet}.")
-        parts.append("Symbolic props only, no UI elements or lettering.")
+        parts.append("Symbolic props only, no UI elements, no borders, no lettering.")
         return " ".join(parts)
 
     if card.type == CardType.GOD:
@@ -130,13 +133,13 @@ def build_prompt(card: Card) -> str:
         ]
         if lore_snippet:
             parts.append(f"Divine aspect hint: {lore_snippet}.")
-        parts.append("Glowing rim light, no human text, no card borders.")
+        parts.append("Glowing rim light, no human text, no borders, no card framing.")
         return " ".join(parts)
 
     return (
-        f"Illustration for card '{card.name}', cinematic and cohesive art direction. "
+        f"Standalone illustration of '{card.name}', cinematic and cohesive art direction. "
         f"Scene suggestion: {scene}. "
-        f"No text or UI elements."
+        f"No text, no UI, no card frame."
     )
 
 
