@@ -33,14 +33,16 @@ def iter_unique_cards() -> Iterable[Card]:
 
 
 def build_prompt(card: Card) -> str:
-    """Create a descriptive prompt for the image model based on card data."""
+    """Create an descriptive prompt for the image model based on card data."""
 
-    parts = [f"Illustration for a trading card named '{card.name}'."]
-    parts.append(f"Card type: {card.type.name.title()}.")
-    if card.tags:
-        parts.append(f"Style cues/tags: {', '.join(card.tags)}.")
-    if card.text:
-        parts.append(f"Card rules text: {card.text}")
+    parts = [f"A cryptid illustration of a '{card.name}' creature, same shared universe and art style, semi-realistic dark folklore realism, anatomically grounded but unnatural, muted earth-tone palette, low-key cinematic lighting, subtle horror without gore, highly detailed textures, mythic and ancient atmosphere, natural environment background, shallow depth of field, no text, no symbols, no borders"]
+
+    #parts = [f"Illustration for a trading card named '{card.name}'."]
+    #parts.append(f"Card type: {card.type.name.title()}.")
+    #if card.tags:
+    #    parts.append(f"Style cues/tags: {', '.join(card.tags)}.")
+    #if card.text:
+    #    parts.append(f"Card rules text: {card.text}")
     return " ".join(parts)
 
 
@@ -51,7 +53,7 @@ def generate_image(
     *,
     overwrite: bool = False,
     size: str = "1024x1024",
-    model: str = "gpt-image-1",
+    model: str = "dall-e-3",
 ) -> Path:
     """Call ChatGPT image generation for a card and persist it to disk."""
 
@@ -78,7 +80,7 @@ def generate_image(
         )
         raise SystemExit(message) from exc
     except APIStatusError as exc:  # pragma: no cover - API behavior
-        raise SystemExit(f"Image generation failed: {exc.message}") from exc
+        raise SystemExit(f"Image generation failed: for {prompt} {exc.message}") from exc
 
     image = response.data[0]
     image_b64 = getattr(image, "b64_json", None)
@@ -119,7 +121,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        default="gpt-image-1",
+        default="dall-e-3",
         help=(
             "Image generation model to use (e.g., gpt-image-1 or dall-e-3). "
             "Use a model available to your account."
