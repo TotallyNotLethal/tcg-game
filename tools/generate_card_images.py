@@ -62,7 +62,12 @@ def generate_image(
 
     prompt = build_prompt(card)
     try:
-        response = client.images.generate(model=model, prompt=prompt, size=size)
+        response = client.images.generate(
+            model=model,
+            prompt=prompt,
+            size=size,
+            response_format="b64_json",
+        )
     except PermissionDeniedError as exc:  # pragma: no cover - API behavior
         message = (
             "Image generation failed with a permission error. The selected model "
@@ -75,6 +80,12 @@ def generate_image(
         raise SystemExit(f"Image generation failed: {exc.message}") from exc
 
     image_b64 = response.data[0].b64_json
+    if image_b64 is None:  # pragma: no cover - depends on API response
+        raise SystemExit(
+            "Image generation did not return base64 data. "
+            "Try rerunning with a supported model (e.g., 'dall-e-3')."
+        )
+
     output_path.write_bytes(base64.b64decode(image_b64))
     print(f"Saved {card.name} -> {output_path}")
     return output_path
