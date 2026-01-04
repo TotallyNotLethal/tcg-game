@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from typing import Iterable, Set
 
+import requests
+
 from openai import APIStatusError, OpenAI, PermissionDeniedError
 
 # Ensure the project root is on the import path when executed as a script
@@ -66,7 +68,6 @@ def generate_image(
             model=model,
             prompt=prompt,
             size=size,
-            response_format="b64_json",
         )
     except PermissionDeniedError as exc:  # pragma: no cover - API behavior
         message = (
@@ -79,14 +80,20 @@ def generate_image(
     except APIStatusError as exc:  # pragma: no cover - API behavior
         raise SystemExit(f"Image generation failed: {exc.message}") from exc
 
-    image_b64 = response.data[0].b64_json
-    if image_b64 is None:  # pragma: no cover - depends on API response
+    image = response.data[0]
+    image_b64 = getattr(image, "b64_json", None)
+    if image_b64:
+        output_path.write_bytes(base64.b64decode(image_b64))
+    elif getattr(image, "url", None):  # pragma: no cover - depends on API response
+        download = requests.get(image.url, timeout=30)
+        download.raise_for_status()
+        output_path.write_bytes(download.content)
+    else:  # pragma: no cover - depends on API response
         raise SystemExit(
-            "Image generation did not return base64 data. "
+            "Image generation did not return image data. "
             "Try rerunning with a supported model (e.g., 'dall-e-3')."
         )
 
-    output_path.write_bytes(base64.b64decode(image_b64))
     print(f"Saved {card.name} -> {output_path}")
     return output_path
 
