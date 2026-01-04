@@ -48,6 +48,8 @@ class GameGUI:
         self.root.title("Cryptid TCG Prototype")
         self.root.configure(bg=self.BG_COLOR)
         self.root.option_add("*Font", "Arial 10")
+        self.root.geometry("1280x960")
+        self.root.minsize(1100, 900)
         self.game: GameState = initial_game(deck_template)
         self.cpu_index: int = 0
         self.human_index: int = 1
@@ -212,7 +214,7 @@ class GameGUI:
 
             hand = tk.Canvas(
                 frame,
-                height=230,
+                height=280,
                 bg=self.HAND_COLOR,
                 highlightthickness=1,
                 highlightbackground=self.BORDER_COLOR,
@@ -1125,7 +1127,7 @@ class GameGUI:
         card_height = 190
         overlap = 70
         start_x = max((canvas.winfo_width() - (card_width + overlap * (hand_size - 1))) / 2, 10)
-        base_y = 8
+        base_y = 18
         center_index = (hand_size - 1) / 2
 
         header_font = self._get_font("Arial", 10, "bold")
