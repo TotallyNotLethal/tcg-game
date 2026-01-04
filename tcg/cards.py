@@ -104,6 +104,7 @@ class Cryptid(Card):
     branches: List[Branch] = field(default_factory=list)
     stats: CombatStats = field(default_factory=CombatStats)
     moves: List[Move] = field(default_factory=list)
+    territory_types: List[str] = field(default_factory=list)
     current_health: int = field(init=False)
 
     def __post_init__(self) -> None:
@@ -156,6 +157,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Watchful guardian that pivots between omen and protector.",
             tags=["Guardian", "Glide"],
+            territory_types=["Forest", "Shrine"],
             stats=CombatStats(power=1, resilience=2, health=4, defense=1, speed=2),
             moves=[
                 Move(name="Wing Buffet", damage=1, text="Soft strike that chips away at defenses."),
@@ -180,6 +182,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=1,
             text="Swamp-dwelling menace that feeds on lopsided resources.",
             tags=["Aquatic", "Constriction"],
+            territory_types=["Water", "Swamp"],
             stats=CombatStats(power=2, resilience=1, health=5, speed=1),
             moves=[
                 Move(name="Tail Whip", damage=2, text="Bludgeon foes caught unaware."),
@@ -205,6 +208,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Mechanical tracker that locks onto volatile energy.",
             tags=["Machine", "Tracker"],
+            territory_types=["Urban", "Machine"],
             stats=CombatStats(power=2, resilience=2, health=5, defense=1, speed=2),
             moves=[
                 Move(name="Scrap Bite", damage=2, text="Jagged metal bite deals steady damage."),
@@ -229,6 +233,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=2,
             text="Thaws slowly, growing denser as Instability rises.",
             tags=["Frost", "Guardian"],
+            territory_types=["Tundra", "Mountain"],
             stats=CombatStats(power=3, resilience=4, health=8, defense=2, speed=1),
             moves=[
                 Move(name="Ice Fist", damage=3, text="Crushes armor with frigid knuckles."),
@@ -253,6 +258,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=2,
             text="Lore keeper that rewards balanced play.",
             tags=["Scholar", "Support"],
+            territory_types=["Shrine", "Library"],
             stats=CombatStats(power=1, resilience=3, health=4, speed=2),
             moves=[
                 Move(name="Ink Splash", damage=1, text="Obscures vision, buying time."),
@@ -277,6 +283,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Navigator attuned to safe Territories.",
             tags=["Scout", "Forest"],
+            territory_types=["Forest"],
             stats=CombatStats(power=2, resilience=2, health=5, defense=1, speed=3),
             moves=[
                 Move(name="Trail Cut", damage=2, text="Carves a clear line to traverse."),
@@ -301,6 +308,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=1,
             text="Small but relentless scavenger that thrives in darkness.",
             tags=["Urban", "Machine"],
+            territory_types=["Urban", "Ruin"],
             stats=CombatStats(power=1, resilience=1, health=3, speed=3),
             moves=[
                 Move(name="Rusty Swipe", damage=1, text="Nicks opponents while darting between cover."),
@@ -326,6 +334,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=1,
             text="Illusionist fox that manipulates perceptions.",
             tags=["Spirit", "Illusion"],
+            territory_types=["Forest", "Shrine"],
             stats=CombatStats(power=2, resilience=1, health=4, speed=4),
             moves=[
                 Move(name="Foxfire", damage=2, text="Blue flames flicker and distract."),
@@ -350,6 +359,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=2,
             text="Precision striker that ramps up with each resolve.",
             tags=["Machine", "Precision"],
+            territory_types=["Machine", "Urban"],
             stats=CombatStats(power=3, resilience=1, health=4, speed=4),
             moves=[
                 Move(name="Sawblades", damage=3, text="Slices through weak points."),
@@ -374,6 +384,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=2,
             text="Steadies the board by weaving chill growths.",
             tags=["Forest", "Frost"],
+            territory_types=["Forest"],
             stats=CombatStats(power=2, resilience=3, health=6, defense=1, speed=2),
             moves=[
                 Move(name="Frost Lash", damage=2, text="Chills attackers, slowing them down."),
@@ -399,6 +410,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=1,
             text="Keeps watch over tidal routes, syncing with events.",
             tags=["Aquatic", "Guardian"],
+            territory_types=["Water", "Bridge"],
             stats=CombatStats(power=2, resilience=3, health=6, defense=1, speed=3),
             moves=[
                 Move(name="Harpoon", damage=2, text="Pierces lightly armored threats."),
@@ -424,6 +436,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Calls tempests when Instability surges.",
             tags=["Storm", "Mythic"],
+            territory_types=["Mountain", "Coast"],
             stats=CombatStats(power=3, resilience=3, health=7, defense=1, speed=3),
             moves=[
                 Move(name="Static Burst", damage=3, text="Crackling blast that arcs between foes."),
@@ -449,6 +462,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=1,
             text="Wind-riding gryphon that hunts in mountainous passes.",
             tags=["Sky", "Predator"],
+            territory_types=["Mountain", "Sky"],
             stats=CombatStats(power=3, resilience=2, health=6, defense=1, speed=4),
             moves=[
                 Move(name="Sky Talons", damage=3, text="Sweeps across the battlefield."),
@@ -473,6 +487,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=2,
             text="Ambusher that emerges from deep fen water.",
             tags=["Aquatic", "Ambush"],
+            territory_types=["Swamp", "Water"],
             stats=CombatStats(power=3, resilience=2, health=6, speed=2),
             moves=[
                 Move(name="Drag Down", damage=3, text="Pulls foes into the marsh."),
@@ -497,6 +512,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=2,
             text="Solar-infused drake that rewards devotion.",
             tags=["Dragon", "Radiant"],
+            territory_types=["Shrine", "Mountain"],
             stats=CombatStats(power=2, resilience=2, health=5, defense=1, speed=3),
             moves=[
                 Move(name="Radiant Bite", damage=3, text="Sears with holy light."),
@@ -522,6 +538,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Spider-like horror spinning dread and destiny.",
             tags=["Shadow", "Web"],
+            territory_types=["Ruin", "Cavern"],
             stats=CombatStats(power=2, resilience=3, health=7, defense=2, speed=2),
             moves=[
                 Move(name="Silk Bolt", damage=2, text="Sticky strands sap speed."),
@@ -546,6 +563,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=1,
             text="Cinder-hopping trickster that slips between sparks.",
             tags=["Ember", "Trickster"],
+            territory_types=["Badlands", "Volcanic"],
             stats=CombatStats(power=1, resilience=1, health=3, speed=4),
             moves=[
                 Move(name="Scorch Kick", damage=1, text="Leaves a smoldering trail."),
@@ -570,6 +588,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=2,
             text="Crystal-horned guardian that refracts prayers.",
             tags=["Crystal", "Guardian"],
+            territory_types=["Forest", "Sanctuary"],
             stats=CombatStats(power=2, resilience=3, health=6, defense=1, speed=2),
             moves=[
                 Move(name="Prismatic Gore", damage=2, text="Splits damage between two targets."),
@@ -594,6 +613,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=1,
             text="Alley-born haunter that feeds on discarded hope.",
             tags=["Urban", "Undead"],
+            territory_types=["Urban"],
             stats=CombatStats(power=2, resilience=1, health=4, speed=2),
             moves=[
                 Move(name="Filth Swipe", damage=1, text="Sickly scratch that festers."),
@@ -619,6 +639,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Oceanic colossus channeling furious tempests.",
             tags=["Aquatic", "Mythic"],
+            territory_types=["Ocean", "Storm"],
             stats=CombatStats(power=5, resilience=4, health=10, defense=2, speed=2),
             moves=[
                 Move(name="Tidal Crush", damage=5, text="Washes foes off the field."),
@@ -644,6 +665,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Ash-winged bird that blots out the sky.",
             tags=["Sky", "Ember"],
+            territory_types=["Volcanic", "Mountain"],
             stats=CombatStats(power=3, resilience=2, health=6, speed=4),
             moves=[
                 Move(name="Ember Rain", damage=3, text="Showers the ground with cinders."),
@@ -668,6 +690,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Tiny household spirit that rewards kindness.",
             tags=["Spirit", "Support"],
+            territory_types=["Village", "Shrine"],
             stats=CombatStats(power=1, resilience=2, health=4, speed=3),
             moves=[
                 Move(name="Kindle", damage=1, text="Bolsters allies with warmth."),
@@ -693,6 +716,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Glass-shelled scarab that channels volcanic wards.",
             tags=["Carapace", "Ward"],
+            territory_types=["Desert", "Volcanic"],
             stats=CombatStats(power=2, resilience=2, health=5, defense=2, speed=1),
             moves=[
                 Move(name="Shard Slash", damage=2, text="Cuts with razor shards."),
@@ -717,6 +741,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=2,
             text="Floating lamp that guides spirits and siphons courage.",
             tags=["Undead", "Illusion"],
+            territory_types=["Ruin", "Shrine"],
             stats=CombatStats(power=1, resilience=2, health=5, defense=1, speed=2),
             moves=[
                 Move(name="Soul Wisp", damage=1, text="Chills foes and marks them."),
@@ -742,6 +767,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Urban legend that jumps rooftops with spectral ease.",
             tags=["Urban", "Sky"],
+            territory_types=["Urban", "Bridge"],
             stats=CombatStats(power=2, resilience=1, health=4, speed=4),
             moves=[
                 Move(name="Parkour Strike", damage=2, text="Leaps through alleys to surprise foes."),
@@ -766,6 +792,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=2,
             text="Slow bulwark that turns belief into shields.",
             tags=["Crystal", "Guardian"],
+            territory_types=["Water", "Sanctuary"],
             stats=CombatStats(power=1, resilience=4, health=7, defense=3, speed=1),
             moves=[
                 Move(name="Shell Bash", damage=2, text="Knocks enemies off balance."),
@@ -790,6 +817,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Wave-skimming steed that carries riders over danger.",
             tags=["Aquatic", "Mount"],
+            territory_types=["Coast", "Water"],
             stats=CombatStats(power=2, resilience=2, health=5, speed=3),
             moves=[
                 Move(name="Spray Kick", damage=2, text="Splashes saltwater into wounds."),
@@ -815,6 +843,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Traveler stepping between fractures in reality.",
             tags=["Walker", "Blade"],
+            territory_types=["Wasteland", "Ruin"],
             stats=CombatStats(power=3, resilience=1, health=4, speed=4),
             moves=[
                 Move(name="Phase Cut", damage=3, text="Slices through magical wards."),
@@ -839,6 +868,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=1,
             text="Desert prophet that reads storms and ruins.",
             tags=["Desert", "Scholar"],
+            territory_types=["Desert", "Ruin"],
             stats=CombatStats(power=1, resilience=2, health=4, speed=3),
             moves=[
                 Move(name="Scouring Dance", damage=1, text="Cuts with swirling grit."),
@@ -863,6 +893,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_belief=1,
             text="Techno-wraith that disrupts resource grids.",
             tags=["Machine", "Frost"],
+            territory_types=["Urban", "Machine"],
             stats=CombatStats(power=2, resilience=1, health=4, speed=3),
             moves=[
                 Move(name="Signal Jam", damage=1, text="Opponents lose 1 speed on their next attack."),
@@ -888,6 +919,7 @@ def cryptid_pool() -> Dict[str, Cryptid]:
             cost_fear=1,
             text="Pilgrim tending the lights between worlds.",
             tags=["Monk", "Illusion"],
+            territory_types=["Bridge", "Shrine"],
             stats=CombatStats(power=2, resilience=2, health=5, speed=2),
             moves=[
                 Move(name="Lantern Jab", damage=2, text="Short strikes that dazzle."),
