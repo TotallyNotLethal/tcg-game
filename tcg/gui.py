@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+import tkinter.font as tkfont
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Tuple
@@ -38,6 +39,8 @@ class GameGUI:
         self.drop_zone_items: Dict[int, tuple[int, int]] = {}
         self.drop_zone_screen_bounds: Dict[int, tuple[int, int, int, int]] = {}
         self._image_cache: Dict[Tuple[str, int, int], tk.PhotoImage] = {}
+        self._font_cache: Dict[Tuple[str, int, str], tkfont.Font] = {}
+        self._hovered_hand_tag: Optional[str] = None
 
         self._build_layout()
         self._render_all()
@@ -220,6 +223,12 @@ class GameGUI:
         self._image_cache[cache_key] = image
         return image
 
+    def _get_font(self, family: str, size: int, weight: str = "normal") -> tkfont.Font:
+        key = (family, size, weight)
+        if key not in self._font_cache:
+            self._font_cache[key] = tkfont.Font(family=family, size=size, weight=weight)
+        return self._font_cache[key]
+
     def _create_drag_preview(self, card: Optional[Card]) -> None:
         if not card:
             return
@@ -286,24 +295,218 @@ class GameGUI:
         canvas.delete("all")
         player = self.game.players[idx]
         self.card_tags = {key: value for key, value in self.card_tags.items() if key[0] != idx}
+        canvas.update_idletasks()
+
+        hand_size = len(player.hand)
+        if hand_size == 0:
+            return
+
+        card_width = 150
+        card_height = 190
+        overlap = 70
+        start_x = max((canvas.winfo_width() - (card_width + overlap * (hand_size - 1))) / 2, 10)
+        base_y = 8
+        center_index = (hand_size - 1) / 2
+
+        header_font = self._get_font("Arial", 10, "bold")
+        body_font = self._get_font("Arial", 9)
+        tiny_font = self._get_font("Arial", 8, "bold")
+
         for i, card in enumerate(player.hand):
-            x = 10 + i * 130
-            y = 10
+            x = start_x + i * overlap
+            y = base_y + abs(i - center_index) * 2
             tag = f"hand_{idx}_{i}"
-            rect = canvas.create_rectangle(x, y, x + 120, y + 110, fill="#ffffff", outline="#6666aa", tags=(tag,))
-            image = self._get_card_image(card, 60, 45)
+            is_selected = self.selected_player_idx == idx and self.selected_tag == tag
+            is_hovered = self._hovered_hand_tag == tag
+            scale = 1.08 if (is_hovered or is_selected) else 1.0
+            lift = 14 if (is_hovered or is_selected) else 0
+
+            scaled_w = card_width * scale
+            scaled_h = card_height * scale
+            x_adjust = x - (scaled_w - card_width) / 2
+            y_adjust = y - lift - (scaled_h - card_height) / 2
+            shadow = canvas.create_rectangle(
+                x_adjust + 6,
+                y_adjust + 10,
+                x_adjust + scaled_w + 6,
+                y_adjust + scaled_h + 10,
+                fill="#c4c8d4",
+                outline="",
+                tags=(tag,),
+            )
+            frame = canvas.create_rectangle(
+                x_adjust,
+                y_adjust,
+                x_adjust + scaled_w,
+                y_adjust + scaled_h,
+                fill="#f9fbff",
+                outline="#6666aa",
+                width=3 if is_selected else 1,
+                tags=(tag,),
+            )
+            canvas.create_rectangle(
+                x_adjust + 6,
+                y_adjust + 6,
+                x_adjust + scaled_w - 6,
+                y_adjust + scaled_h - 6,
+                fill="#ffffff",
+                outline="#a2a8c5",
+                width=1,
+                tags=(tag,),
+            )
+
+            canvas.create_rectangle(
+                x_adjust + 6,
+                y_adjust + 6,
+                x_adjust + scaled_w - 6,
+                y_adjust + 34,
+                fill="#e7ecff",
+                outline="",
+                tags=(tag,),
+            )
+            canvas.create_text(
+                x_adjust + 12,
+                y_adjust + 20,
+                text=card.name,
+                anchor="w",
+                font=header_font,
+                tags=(tag,),
+            )
+
+            cost_x = x_adjust + scaled_w - 10
+            if card.cost_belief:
+                canvas.create_oval(
+                    cost_x - 20,
+                    y_adjust + 10,
+                    cost_x - 6,
+                    y_adjust + 24,
+                    fill="#f3d48c",
+                    outline="#b08a28",
+                    width=1,
+                    tags=(tag,),
+                )
+                canvas.create_text(
+                    cost_x - 13,
+                    y_adjust + 17,
+                    text=str(card.cost_belief),
+                    font=tiny_font,
+                    fill="#5b420f",
+                    tags=(tag,),
+                )
+                cost_x -= 22
+            if card.cost_fear:
+                canvas.create_oval(
+                    cost_x - 20,
+                    y_adjust + 10,
+                    cost_x - 6,
+                    y_adjust + 24,
+                    fill="#c9b7f7",
+                    outline="#6540c2",
+                    width=1,
+                    tags=(tag,),
+                )
+                canvas.create_text(
+                    cost_x - 13,
+                    y_adjust + 17,
+                    text=str(card.cost_fear),
+                    font=tiny_font,
+                    fill="#3a1b6f",
+                    tags=(tag,),
+                )
+
+            image = self._get_card_image(card, 100, 70)
+            image_top = y_adjust + 40
+            image_height = 70
             if image:
-                canvas.create_image(x + 60, y + 40, image=image, tags=(tag,))
-                text_y = y + 80
+                canvas.create_rectangle(
+                    x_adjust + 10,
+                    image_top,
+                    x_adjust + scaled_w - 10,
+                    image_top + image_height,
+                    fill="#eef1ff",
+                    outline="#d0d4ee",
+                    tags=(tag,),
+                )
+                canvas.create_image(
+                    x_adjust + scaled_w / 2,
+                    image_top + image_height / 2,
+                    image=image,
+                    tags=(tag,),
+                )
+            body_top = image_top + image_height + 6
+            text_block_height = 44
+            canvas.create_text(
+                x_adjust + 12,
+                body_top,
+                anchor="nw",
+                text=(card.text or "")[:120] + ("..." if len(card.text) > 120 else ""),
+                width=scaled_w - 24,
+                font=body_font,
+                tags=(tag,),
+            )
+
+            stats_top = body_top + text_block_height
+            if isinstance(card, Cryptid):
+                stats = card.stats
+                stat_box_height = 26
+                canvas.create_rectangle(
+                    x_adjust + 10,
+                    stats_top,
+                    x_adjust + scaled_w - 10,
+                    stats_top + stat_box_height,
+                    fill="#eef7ff",
+                    outline="#c3d8ff",
+                    tags=(tag,),
+                )
+                canvas.create_text(
+                    x_adjust + scaled_w / 2,
+                    stats_top + stat_box_height / 2,
+                    text=f"PWR {stats.power}  DEF {stats.defense}  HP {card.current_health}/{stats.health}",
+                    font=self._get_font("Arial", 9, "bold"),
+                    tags=(tag,),
+                )
+
+                move_top = stats_top + stat_box_height + 4
+                moves_to_show = card.moves[:2]
+                for move in moves_to_show:
+                    move_text = move.describe()
+                    canvas.create_text(
+                        x_adjust + 12,
+                        move_top,
+                        anchor="nw",
+                        text=move_text,
+                        width=scaled_w - 24,
+                        font=self._get_font("Arial", 8),
+                        tags=(tag,),
+                    )
+                    move_top += 18
             else:
-                text_y = y + 55
-            text_tag = canvas.create_text(x + 60, text_y, text=card.name, width=110, tags=(tag,))
+                canvas.create_rectangle(
+                    x_adjust + 10,
+                    stats_top,
+                    x_adjust + scaled_w - 10,
+                    stats_top + 26,
+                    fill="#f9f1ea",
+                    outline="#e2c7a6",
+                    tags=(tag,),
+                )
+                canvas.create_text(
+                    x_adjust + 12,
+                    stats_top + 6,
+                    anchor="nw",
+                    text="Support",
+                    font=self._get_font("Arial", 9, "bold"),
+                    tags=(tag,),
+                )
+
             self.card_tags[(idx, tag)] = card
             canvas.tag_bind(tag, "<Button-1>", lambda e, t=tag, p=idx: self._select_card(p, t))
             canvas.tag_bind(tag, "<ButtonPress-1>", lambda e, t=tag, p=idx: self._start_drag(e, p, t))
             canvas.tag_bind(tag, "<B1-Motion>", lambda e, t=tag, p=idx: self._drag(e, p, t))
             canvas.tag_bind(tag, "<ButtonRelease-1>", lambda e, t=tag, p=idx: self._end_drag(e, p, t))
-            canvas.itemconfig(text_tag, font=("Arial", 9, "bold"))
+            canvas.tag_bind(tag, "<Enter>", lambda e, t=tag, p=idx: self._set_hover(t, p))
+            canvas.tag_bind(tag, "<Leave>", lambda e, t=tag, p=idx: self._clear_hover(t, p))
+            canvas.tag_raise(tag)
 
         if self.selected_player_idx == idx:
             if self.selected_card is None or self.selected_card not in player.hand:
@@ -312,6 +515,18 @@ class GameGUI:
                 new_index = player.hand.index(self.selected_card)
                 self.selected_tag = f"hand_{idx}_{new_index}"
                 self._apply_selection_highlight()
+
+    def _set_hover(self, tag: str, player_idx: int) -> None:
+        if player_idx != self.human_index:
+            return
+        self._hovered_hand_tag = tag
+        self._render_hand(player_idx)
+
+    def _clear_hover(self, tag: str, player_idx: int) -> None:
+        if self._hovered_hand_tag != tag:
+            return
+        self._hovered_hand_tag = None
+        self._render_hand(player_idx)
 
     def _select_card(self, player_idx: int, tag: str) -> None:
         if player_idx != self.human_index:
