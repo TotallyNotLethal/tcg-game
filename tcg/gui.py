@@ -149,6 +149,7 @@ class GameGUI:
         self.resource_labels = []
         self.influence_labels = []
         self.battlefield_canvases = []
+        self.battlefield_layouts: list[dict[str, object]] = []
         self.hand_canvases = []
 
         for idx, player in enumerate(self.game.players):
@@ -197,13 +198,14 @@ class GameGUI:
 
             battlefield = tk.Canvas(
                 frame,
-                height=180,
+                height=340,
                 bg=self.SURFACE_COLOR,
                 highlightthickness=1,
                 highlightbackground=self.BORDER_COLOR,
             )
             battlefield.pack(side=tk.TOP, fill=tk.X, padx=4, pady=(8, 6))
             self.battlefield_canvases.append(battlefield)
+            self.battlefield_layouts.append({})
 
             hand = tk.Canvas(
                 frame,
@@ -262,132 +264,330 @@ class GameGUI:
         canvas = self.battlefield_canvases[idx]
         canvas.delete("all")
         player = self.game.players[idx]
-        self._draw_drop_zone(idx)
-        for i, card in enumerate(player.battlefield):
-            x = 16 + i * 150
-            y = 12
-            width = 140
-            height = 150
-            shadow = canvas.create_rectangle(
-                x + 6,
-                y + 8,
-                x + width + 6,
-                y + height + 8,
-                fill=self.SHADOW_COLOR,
-                outline="",
-            )
-            rect = canvas.create_rectangle(
-                x,
-                y,
-                x + width,
-                y + height,
-                fill=self.CARD_FACE,
-                outline=self.ACCENT_COLOR,
-                width=2,
-            )
-            canvas.create_rectangle(
-                x + 5,
-                y + 5,
-                x + width - 5,
-                y + height - 5,
-                fill=self.CARD_INNER,
-                outline=self.BORDER_COLOR,
-                width=1,
-            )
-            name_bar = canvas.create_rectangle(
-                x + 8,
-                y + 8,
-                x + width - 8,
-                y + 30,
-                fill=self.CARD_TYPE_STRIP,
-                outline=self.ACCENT_COLOR,
-                width=1,
-            )
-            canvas.create_text(
-                x + 12,
-                y + 19,
-                anchor="w",
-                text=card.name,
-                font=("Arial", 10, "bold"),
-                fill=self.TEXT_COLOR,
-            )
-            if card.cost_belief or card.cost_fear:
-                cost_text = self._format_cost(card)
-                canvas.create_text(
-                    x + width - 10,
-                    y + 19,
-                    anchor="e",
-                    text=cost_text,
-                    font=self._get_font("Arial", 9, "bold"),
-                    fill=self.SECONDARY_ACCENT,
-                )
-            art_image = self._get_card_image(card, 90, 65)
-            art_top = y + 36
-            art_height = 70
-            canvas.create_rectangle(
-                x + 10,
-                art_top,
-                x + width - 10,
-                art_top + art_height,
-                fill=self.PANEL_COLOR,
-                outline=self.BORDER_COLOR,
-            )
-            if art_image:
-                canvas.create_image(x + width / 2, art_top + art_height / 2, image=art_image)
-            desc_y = art_top + art_height + 6
-            canvas.create_text(
-                x + 12,
-                desc_y,
-                anchor="nw",
-                text=card.text[:70] + ("..." if len(card.text) > 70 else ""),
-                width=width - 24,
-                font=self._get_font("Arial", 9),
-                fill=self.MUTED_TEXT,
-            )
-            stats_y = desc_y + 32
-            banner = canvas.create_rectangle(
-                x + 10,
-                stats_y,
-                x + width - 10,
-                stats_y + 24,
-                fill=self.FACTION_BANNER,
-                outline=self.ACCENT_COLOR,
-                width=1,
-            )
-            if isinstance(card, Cryptid):
-                canvas.create_text(
-                    x + width / 2,
-                    stats_y + 12,
-                    text=f"PWR {card.stats.power}  DEF {card.stats.defense}  HP {card.current_health}/{card.stats.health}",
-                    font=self._get_font("Arial", 9, "bold"),
-                    fill=self.TEXT_COLOR,
-                )
-            elif isinstance(card, GodCard):
-                canvas.create_text(
-                    x + width / 2,
-                    stats_y + 12,
-                    text=card.prayer_text or "Divinity", 
-                    font=self._get_font("Arial", 9, "bold"),
-                    fill=self.TEXT_COLOR,
-                )
-            else:
-                canvas.create_text(
-                    x + width / 2,
-                    stats_y + 12,
-                    text="Support",
-                    font=self._get_font("Arial", 9, "bold"),
-                    fill=self.TEXT_COLOR,
-                )
-            canvas.itemconfigure(rect, tags=(f"bf_{idx}_{i}",))
+        layout = self._get_battlefield_layout(idx)
+        self._draw_battlefield_zones(canvas, layout, player)
+        self._draw_drop_zone(idx, layout)
 
-    def _draw_drop_zone(self, idx: int) -> None:
+        active_card: Optional[Card] = None
+        bench_cards: list[Card] = []
+        territory_cards: list[object] = []
+        prayer_cards: list[Card] = []
+
+        for card in player.battlefield:
+            if isinstance(card, TerritoryCard):
+                territory_cards.append(card)
+            elif isinstance(card, GodCard):
+                prayer_cards.append(card)
+            elif isinstance(card, Cryptid):
+                if not active_card:
+                    active_card = card
+                else:
+                    bench_cards.append(card)
+            else:
+                bench_cards.append(card)
+
+        for territory in player.territories:
+            territory_cards.append(territory)
+
+        if active_card:
+            x1, y1, x2, y2 = layout["active"]
+            self._draw_card_at(canvas, active_card, x1, y1, x2 - x1, y2 - y1, f"bf_{idx}_active")
+
+        for slot, card in zip(layout["bench"], bench_cards):
+            x1, y1, x2, y2 = slot
+            self._draw_card_at(canvas, card, x1, y1, x2 - x1, y2 - y1, f"bf_{idx}_bench")
+
+        for i, card in enumerate(prayer_cards):
+            x1, y1, x2, y2 = layout["prayer"]
+            offset = i * 14
+            self._draw_card_at(
+                canvas,
+                card,
+                x1 + offset,
+                y1 + offset,
+                x2 - x1 - offset * 2,
+                y2 - y1 - offset * 2,
+                f"bf_{idx}_prayer_{i}",
+            )
+
+        for slot, territory in zip(layout["territories"], territory_cards):
+            x1, y1, x2, y2 = slot
+            self._draw_territory_tile(canvas, territory, x1, y1, x2 - x1, y2 - y1)
+
+    def _get_battlefield_layout(self, idx: int) -> dict[str, object]:
         canvas = self.battlefield_canvases[idx]
         canvas.update_idletasks()
-        pad = 8
-        width = max(canvas.winfo_width() - pad * 2, 160)
-        height = max(canvas.winfo_height() - pad * 2, 110)
-        x1, y1 = pad, pad
-        x2, y2 = x1 + width, y1 + height
+        width = max(canvas.winfo_width(), 820)
+        height = max(canvas.winfo_height(), 320)
+        padding = 14
+        pile_gap = 12
+        pile_width, pile_height = 120, 58
+        top_y = padding
+        piles_total_width = pile_width * 3 + pile_gap * 2
+        piles_start_x = max(padding, (width - piles_total_width) / 2)
+
+        center_x = width / 2
+        active_width, active_height = 135, 150
+        active_y = top_y + pile_height + 14
+        bench_spacing = active_width + 16
+
+        territory_width, territory_height = 118, 72
+        territory_spacing = territory_width + 18
+        territory_y = active_y + active_height + 18
+
+        layout = {
+            "deck": (
+                piles_start_x,
+                top_y,
+                piles_start_x + pile_width,
+                top_y + pile_height,
+            ),
+            "discard": (
+                piles_start_x + pile_width + pile_gap,
+                top_y,
+                piles_start_x + pile_width * 2 + pile_gap,
+                top_y + pile_height,
+            ),
+            "prayer": (
+                piles_start_x + (pile_width + pile_gap) * 2,
+                top_y,
+                piles_start_x + pile_width * 3 + pile_gap * 2,
+                top_y + pile_height,
+            ),
+            "active": (
+                center_x - active_width / 2,
+                active_y,
+                center_x + active_width / 2,
+                active_y + active_height,
+            ),
+            "bench": [
+                (
+                    center_x - 1.5 * bench_spacing,
+                    active_y,
+                    center_x - 1.5 * bench_spacing + active_width,
+                    active_y + active_height,
+                ),
+                (
+                    center_x - 0.5 * bench_spacing,
+                    active_y,
+                    center_x - 0.5 * bench_spacing + active_width,
+                    active_y + active_height,
+                ),
+                (
+                    center_x + 0.5 * bench_spacing,
+                    active_y,
+                    center_x + 0.5 * bench_spacing + active_width,
+                    active_y + active_height,
+                ),
+                (
+                    center_x + 1.5 * bench_spacing,
+                    active_y,
+                    center_x + 1.5 * bench_spacing + active_width,
+                    active_y + active_height,
+                ),
+            ],
+            "territories": [
+                (
+                    center_x - territory_spacing,
+                    territory_y,
+                    center_x - territory_spacing + territory_width,
+                    territory_y + territory_height,
+                ),
+                (
+                    center_x - territory_width / 2,
+                    territory_y,
+                    center_x + territory_width / 2,
+                    territory_y + territory_height,
+                ),
+                (
+                    center_x + territory_spacing - territory_width,
+                    territory_y,
+                    center_x + territory_spacing,
+                    territory_y + territory_height,
+                ),
+            ],
+        }
+        self.battlefield_layouts[idx] = layout
+        return layout
+
+    def _draw_battlefield_zones(self, canvas: tk.Canvas, layout: dict[str, object], player: "PlayerState") -> None:
+        def draw_slot(coords: tuple[float, float, float, float], label: str, fill: str, accent: str) -> None:
+            x1, y1, x2, y2 = coords
+            canvas.create_rectangle(x1, y1, x2, y2, outline=accent, width=2, fill=fill)
+            canvas.create_text(
+                (x1 + x2) / 2,
+                y1 - 10,
+                text=label,
+                fill=self.MUTED_TEXT,
+                font=("Arial", 9, "bold"),
+            )
+
+        canvas.create_rectangle(0, 0, canvas.winfo_width(), canvas.winfo_height(), fill=self.SURFACE_COLOR, outline="")
+        draw_slot(layout["deck"], f"Deck ({len(player.deck)})", self.TABLE_COLOR, self.BORDER_COLOR)
+        discard_size = len(getattr(player, "discard_pile", []))
+        draw_slot(layout["discard"], f"Discard ({discard_size})", self.TABLE_COLOR, self.BORDER_COLOR)
+        draw_slot(layout["prayer"], "Prayer Pile", self.TABLE_COLOR, self.ACCENT_COLOR)
+
+        draw_slot(layout["active"], "Active Slot", self.PANEL_COLOR, self.ACCENT_COLOR)
+        for i, bench_slot in enumerate(layout["bench"]):
+            draw_slot(bench_slot, f"Ally {i + 1}", self.PANEL_COLOR, self.BORDER_COLOR)
+
+        for i, territory_slot in enumerate(layout["territories"]):
+            draw_slot(territory_slot, f"Territory {i + 1}", self.TABLE_COLOR, self.BORDER_COLOR)
+
+        canvas.create_line(
+            10,
+            layout["territories"][0][1] - 6,
+            canvas.winfo_width() - 10,
+            layout["territories"][0][1] - 6,
+            fill=self.BORDER_COLOR,
+            dash=(4, 4),
+        )
+
+    def _draw_card_at(
+        self, canvas: tk.Canvas, card: Card, x: float, y: float, width: float, height: float, tag: str
+    ) -> None:
+        shadow = canvas.create_rectangle(
+            x + 6,
+            y + 8,
+            x + width + 6,
+            y + height + 8,
+            fill=self.SHADOW_COLOR,
+            outline="",
+        )
+        rect = canvas.create_rectangle(
+            x,
+            y,
+            x + width,
+            y + height,
+            fill=self.CARD_FACE,
+            outline=self.ACCENT_COLOR,
+            width=2,
+        )
+        canvas.create_rectangle(
+            x + 5,
+            y + 5,
+            x + width - 5,
+            y + height - 5,
+            fill=self.CARD_INNER,
+            outline=self.BORDER_COLOR,
+            width=1,
+        )
+        canvas.create_rectangle(
+            x + 8,
+            y + 8,
+            x + width - 8,
+            y + 30,
+            fill=self.CARD_TYPE_STRIP,
+            outline=self.ACCENT_COLOR,
+            width=1,
+        )
+        canvas.create_text(
+            x + 12,
+            y + 19,
+            anchor="w",
+            text=card.name,
+            font=("Arial", 10, "bold"),
+            fill=self.TEXT_COLOR,
+        )
+        if card.cost_belief or card.cost_fear:
+            cost_text = self._format_cost(card)
+            canvas.create_text(
+                x + width - 10,
+                y + 19,
+                anchor="e",
+                text=cost_text,
+                font=self._get_font("Arial", 9, "bold"),
+                fill=self.SECONDARY_ACCENT,
+            )
+        art_image = self._get_card_image(card, int(width * 0.65), 65)
+        art_top = y + 36
+        art_height = 70
+        canvas.create_rectangle(
+            x + 10,
+            art_top,
+            x + width - 10,
+            art_top + art_height,
+            fill=self.PANEL_COLOR,
+            outline=self.BORDER_COLOR,
+        )
+        if art_image:
+            canvas.create_image(x + width / 2, art_top + art_height / 2, image=art_image)
+        desc_y = art_top + art_height + 6
+        canvas.create_text(
+            x + 12,
+            desc_y,
+            anchor="nw",
+            text=card.text[:70] + ("..." if len(card.text) > 70 else ""),
+            width=width - 24,
+            font=self._get_font("Arial", 9),
+            fill=self.MUTED_TEXT,
+        )
+        stats_y = desc_y + 32
+        canvas.create_rectangle(
+            x + 10,
+            stats_y,
+            x + width - 10,
+            stats_y + 24,
+            fill=self.FACTION_BANNER,
+            outline=self.ACCENT_COLOR,
+            width=1,
+        )
+        if isinstance(card, Cryptid):
+            canvas.create_text(
+                x + width / 2,
+                stats_y + 12,
+                text=f"PWR {card.stats.power}  DEF {card.stats.defense}  HP {card.current_health}/{card.stats.health}",
+                font=self._get_font("Arial", 9, "bold"),
+                fill=self.TEXT_COLOR,
+            )
+        elif isinstance(card, GodCard):
+            canvas.create_text(
+                x + width / 2,
+                stats_y + 12,
+                text=card.prayer_text or "Divinity",
+                font=self._get_font("Arial", 9, "bold"),
+                fill=self.TEXT_COLOR,
+            )
+        else:
+            canvas.create_text(
+                x + width / 2,
+                stats_y + 12,
+                text="Support",
+                font=self._get_font("Arial", 9, "bold"),
+                fill=self.TEXT_COLOR,
+            )
+        canvas.itemconfigure(rect, tags=(tag,))
+
+    def _draw_territory_tile(
+        self, canvas: tk.Canvas, territory: object, x: float, y: float, width: float, height: float
+    ) -> None:
+        name = getattr(territory, "name", "Territory")
+        canvas.create_rectangle(x, y, x + width, y + height, fill=self.TABLE_COLOR, outline=self.ACCENT_COLOR, width=2)
+        canvas.create_rectangle(
+            x + 4,
+            y + 4,
+            x + width - 4,
+            y + height - 4,
+            fill=self.PANEL_COLOR,
+            outline=self.BORDER_COLOR,
+        )
+        canvas.create_text(
+            x + width / 2,
+            y + height / 2,
+            text=name,
+            fill=self.TEXT_COLOR,
+            font=("Arial", 10, "bold"),
+        )
+
+    def _draw_drop_zone(self, idx: int, layout: dict[str, object]) -> None:
+        canvas = self.battlefield_canvases[idx]
+        canvas.update_idletasks()
+        active_and_bench = [layout["active"], *layout["bench"]]
+        x1 = min(slot[0] for slot in active_and_bench) - 10
+        y1 = min(slot[1] for slot in active_and_bench) - 10
+        x2 = max(slot[2] for slot in active_and_bench) + 10
+        y2 = max(slot[3] for slot in active_and_bench) + 10
         rect_tag = f"drop_zone_{idx}_rect"
         label_tag = f"drop_zone_{idx}_label"
         self._clear_drop_zone_gradient(idx)
